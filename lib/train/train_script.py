@@ -34,7 +34,6 @@ def run(settings):
 
     # update settings based on cfg
     update_settings(settings, cfg)
-    #data_recorder.set_sampling(settings.selected_sampling)
     log_dir = os.path.join(settings.save_dir, 'logs')
     if settings.local_rank in [-1, 0]:
         if not os.path.exists(log_dir):
