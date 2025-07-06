@@ -1,0 +1,48 @@
+How Settings are Loaded and Used in the Codebase
+=============================================
+
+1. Initial Loading:
+   - Training starts in `train_script.py`
+   - Configuration is loaded from `lib.config.<script_name>.config` (e.g., `lib.config.seqtrack.config`)
+   - The `update_settings` function is called with the settings object and loaded configuration
+
+2. Settings Update (in base_functions.py):
+   - The `update_settings` function updates the settings object with values from the configuration
+   - Key settings loaded include:
+     * `selected_sampling`
+     * `selected_sampling_epoch`
+     * `top_sample_ratio`
+     * `top_selected_samples`
+
+3. Default Configuration (in lib/config/seqtrack/config.py):
+   ```python
+   cfg.TRAIN.selected_sampling = False
+   cfg.TRAIN.selected_sampling_epoch = 2
+   cfg.TRAIN.top_sample_ratio = 0.5
+   cfg.TRAIN.top_selected_samples = 10
+   ```
+
+4. Hardcoded Settings (in lib/train/data_recorder.py):
+   ```python
+   _chunk_size = 5  # Controls how many samples to buffer before saving to disk
+   ```
+
+5. Usage in Training:
+   - These settings control the training behavior
+   - `selected_sampling_epoch` determines when selected sampling starts
+   - `_chunk_size` controls the buffer size for saving samples to disk
+   - The settings are used in data sampling logic throughout training
+
+6. Modifying Settings:
+   To change these settings, you can either:
+   - Edit default values in `lib/config/seqtrack/config.py`
+   - Override them in your experiment's YAML config (e.g., `experiments/seqtrack/seqtrack_b256.yaml`)
+   - For `_chunk_size`, modify it directly in `lib/train/data_recorder.py` as it's a hardcoded value
+
+7. Key Files Involved:
+   - `train_script.py`: Entry point, loads config and starts training
+   - `base_functions.py`: Contains update_settings function
+   - `lib/config/seqtrack/config.py`: Default configuration values
+   - `lib/train/data/sampler.py`: Uses these settings for data sampling
+   - `lib/train/data_recorder.py`: Handles data recording with `_chunk_size`
+   - Your experiment's YAML config: Can override default values
