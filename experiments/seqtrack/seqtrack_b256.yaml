@@ -44,7 +44,7 @@ MODEL:
 TRAIN:
   ENCODER_MULTIPLIER: 0.1
   BATCH_SIZE: 1
-  max_epochs: 5                                # Number of training epochs
+  max_epochs: 5                               # Number of training epochs
   GRAD_CLIP_NORM: 0.1
   CE_WEIGHT: 1.0
   LR: 0.0001
@@ -58,8 +58,8 @@ TRAIN:
   ss_print_interval: 10
   checkpoint_save_interval: 1               # Number of epochs between checkpoints
   selected_sampling: true                   # Whether to use selected sampling
-  selected_sampling_epoch: 3
-  top_sample_ratio: .3
+  selected_sampling_epoch: 4
+  top_sample_ratio: .6
   top_selected_samples: 2
   #current_epoch: 0
 TEST:
