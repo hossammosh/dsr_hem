@@ -6,7 +6,7 @@ from easydict import EasyDict as edict
 
 def get_phases_config():
     """
-    Returns the phases configuration dictionary with lambda functions for dynamic EPOCH_RANGE calculation. 1234568
+    Returns the phases configuration dictionary with lambda functions for dynamic EPOCH_RANGE calculation. 789
     
     Returns:
         dict: Dictionary containing phase configurations with lambda functions for EPOCH_RANGE but it should be called
