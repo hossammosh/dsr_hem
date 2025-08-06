@@ -29,7 +29,7 @@ def run(settings):
         raise ValueError("%s doesn't exist." % settings.cfg_file)
     config_module = importlib.import_module("lib.config.%s.config" % settings.script_name)
     cfg = config_module.cfg  # generate cfg from lib.config
-    config_module.update_config_from_file(settings.cfg_file)  # update cfg from experiments
+    config_module.update_config_from_file(settings.cfg_file)  # update cfg from experiments 123
     
     # Initialize phase configurations
     if not hasattr(cfg, 'PHASES'):
