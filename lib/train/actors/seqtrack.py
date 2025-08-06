@@ -16,7 +16,7 @@ class SeqTrackActor(BaseActor):
     def __call__(self, data):
         """
         args:
-            data - The input data, should contain the fields 'template', 'search', 'search_anno'.
+            data - The input data, should contain the fields 'template', 'search', 'search_anno'.123
             template_images: (N_t, batch, 3, H, W)
             search_images: (N_s, batch, 3, H, W)
         returns:
