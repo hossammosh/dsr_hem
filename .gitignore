@@ -21,9 +21,7 @@ __pycache__/
 
 # Ignore large files or logs
 *.pth
-*.tar
 *.zip
-*.log
 *.pdf
 
 # Ignore virtual environments

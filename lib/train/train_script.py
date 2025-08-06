@@ -1,4 +1,5 @@
 import os
+from easydict import EasyDict as edict
 # loss function related
 from lib.utils.box_ops import giou_loss
 from torch.nn.functional import l1_loss
@@ -13,6 +14,9 @@ from .base_functions import *
 from lib.models.seqtrack import build_seqtrack
 # forward propagation related
 from lib.train.actors import SeqTrackActor
+# phase configuration related
+from lib.config.seqtrack import phases as phase_module
+from lib.config.seqtrack.phases import initialize_phases
 # for import modules
 import importlib
 import lib.train.data_recorder as data_recorder
@@ -26,14 +30,28 @@ def run(settings):
     config_module = importlib.import_module("lib.config.%s.config" % settings.script_name)
     cfg = config_module.cfg  # generate cfg from lib.config
     config_module.update_config_from_file(settings.cfg_file)  # update cfg from experiments
+    
+    # Initialize phase configurations
+    if not hasattr(cfg, 'PHASES'):
+        cfg.PHASES = edict()
+    initialize_phases(cfg.PHASES, cfg)
+
     if settings.local_rank in [-1, 0]:
         print("New configuration is shown below.")
         for key in cfg.keys():
             print("%s configuration:" % key, cfg[key])
             print('\n')
-
-    # update settings based on cfg
     update_settings(settings, cfg)
+    
+    # Print phase configurations from settings
+    if hasattr(settings, 'PHASES'):
+        print("\nPHASE CONFIGURATIONS (from settings):")
+        for phase_name, phase_cfg in settings.phases.items():
+            if hasattr(phase_cfg, 'NAME'):  # This filters out the numerical constants
+                print(f"\n{phase_name.upper()}:")
+                for key, value in phase_cfg.items():
+                    print(f"  {key}: {value}")
+    
     log_dir = os.path.join(settings.save_dir, 'logs')
     if settings.local_rank in [-1, 0]:
         if not os.path.exists(log_dir):
@@ -79,7 +97,6 @@ def run(settings):
     # Optimizer, parameters, and learning rates
     optimizer, lr_scheduler = get_optimizer_scheduler(net, cfg)
     use_amp = getattr(cfg.TRAIN, "AMP", False)
-
     trainer = LTRTrainer(actor, [loader_train], optimizer, settings, lr_scheduler, use_amp=use_amp)
-    #trainer.train(cfg.TRAIN.max_epochs, load_latest=False, fail_safe=True)
     trainer.train(cfg.TRAIN.max_epochs, load_latest=True, fail_safe=True)
+    #trainer.train(cfg.TRAIN.max_epochs, load_latest=False, load_ckpt=5, fail_safe=True)

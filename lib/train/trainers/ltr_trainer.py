@@ -45,18 +45,13 @@ class LTRTrainer(BaseTrainer):
 
         # ----- NEW: Initialize iteration counter for Excel logging frequency -----
         self.iteration_counter = 0
-        #data_recorder.set_sampling(settings.selected_sampling)
     def cycle_dataset(self, loader):
         """Do a cycle of training or validation."""
         print('start training...',flush=True)
         self.actor.train(loader.training)
         torch.set_grad_enabled(loader.training)
         self._init_timing()
-        # Ensure sampling mode is properly set at the start of each epoch
-        # data_recorder.set_sampling(self.settings.selected_sampling)
-        # data_recorder.set_epoch(self.settings.epoch,settings=self.settings)
         self.last_time_print = time.time()
-        # Initialize timing
         self.iteration_counter = 0
 
 
@@ -65,6 +60,7 @@ class LTRTrainer(BaseTrainer):
             data_info = data[1]
             sample_index = data[2]
             data = data[0]
+            print(f"Processing sample {sample_index}, iteration {self.iteration_counter}", flush=True)
             if self.move_data_to_gpu:
                 data = data.to(self.device)
             data['epoch'] = self.settings.epoch
@@ -73,10 +69,23 @@ class LTRTrainer(BaseTrainer):
 
             # Forward pass
             loss, stats = self.actor(data)
+
+            # Save sample statistics with better error reporting
             try:
-                data_recorder.samples_stats_save(sample_index=sample_index,data_info=data_info,stats=stats)
+                data_recorder.samples_stats_save(
+                    sample_index=sample_index,
+                    data_info=data_info,
+                    stats=stats,
+                    settings=self.settings
+                )
+                print(f"Successfully saved sample {sample_index} to buffer", flush=True)
+                print(f"Current buffer size: {len(data_recorder._buffer)}", flush=True)
             except Exception as e:
-                print(f"Error saving sample statistics: {e}",flush=True)
+                print(f"Error saving sample statistics: {str(e)}", flush=True)
+                import traceback
+                traceback.print_exc()
+            
+            print(f"--- After saving sample {sample_index} ---\n", flush=True)
 
             # Backward pass and parameter updates (only if not in stats saving mode)
             if loader.training : #and not save_stats_permission
@@ -132,7 +141,6 @@ class LTRTrainer(BaseTrainer):
     def _write_tensorboard(self):
         if self.settings.epoch == 1:
             self.tensorboard_writer.write_info(self.settings.script_name, self.settings.description)
-
         self.tensorboard_writer.write_epoch(self.stats, self.settings.epoch)
 
     def _init_timing(self):
@@ -273,4 +281,3 @@ class LTRTrainer(BaseTrainer):
         if self.settings.epoch == 1:
             self.tensorboard_writer.write_info(self.settings.script_name, self.settings.description)
         self.tensorboard_writer.write_epoch(self.stats, self.settings.epoch)
-

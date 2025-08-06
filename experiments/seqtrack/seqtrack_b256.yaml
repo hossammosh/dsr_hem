@@ -23,15 +23,18 @@ DATA:
   TRAIN:
     DATASETS_NAME:
     - LASOT
-#    - GOT10K_vottrain
-#    - COCO17
-#    - TRACKINGNET
     DATASETS_RATIO:
     - 1
-#    - 1
-#    - 1
-#    - 1
-    SAMPLE_PER_EPOCH: 20                     # Number of training samples per epoch
+    SAMPLE_PER_EPOCH: 25                    # Number of training samples per epoch
+PHASES:
+  SPE1: 1
+  SPE2: 0.6
+  SPE3: 0.6
+  SPE4: 0.25
+  L1: 5
+  L2: 10
+  L3: 15
+  L4: 20
 MODEL:
   ENCODER:
     TYPE: vit_base_patch16
@@ -44,7 +47,10 @@ MODEL:
 TRAIN:
   ENCODER_MULTIPLIER: 0.1
   BATCH_SIZE: 1
-  max_epochs: 5                               # Number of training epochs
+  max_epochs: 25  # Total training epochs
+
+  # Phase parameters moved to root level
+
   GRAD_CLIP_NORM: 0.1
   CE_WEIGHT: 1.0
   LR: 0.0001
@@ -55,13 +61,11 @@ TRAIN:
     TYPE: step
     DECAY_RATE: 0.1
   WEIGHT_DECAY: 0.0001
-  ss_print_interval: 10
+  ss_print_interval: 100
   checkpoint_save_interval: 1               # Number of epochs between checkpoints
   selected_sampling: true                   # Whether to use selected sampling
-  selected_sampling_epoch: 4
+  selected_sampling_epoch: 10
   top_sample_ratio: .6
-  top_selected_samples: 2
-  #current_epoch: 0
 TEST:
   EPOCH: 1
   SEARCH_FACTOR: 4.0

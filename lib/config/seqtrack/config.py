@@ -25,8 +25,6 @@ cfg.MODEL.DECODER.DIM_FEEDFORWARD = 1024
 cfg.MODEL.DECODER.DEC_LAYERS = 6
 cfg.MODEL.DECODER.PRE_NORM = False
 
-# DATA COLLECTION
-
 # TRAIN
 cfg.TRAIN = edict()
 cfg.TRAIN.LR = 0.0001
@@ -53,8 +51,19 @@ cfg.TRAIN.selected_sampling=False
 cfg.TRAIN.selected_sampling_epoch=2
 cfg.TRAIN.top_sample_ratio=.5
 cfg.TRAIN.top_selected_samples=10
-#cfg.TRAIN.current_epoch=0
 
+# PHASES configuration
+cfg.PHASES = edict()
+cfg.PHASES.SPE1 = 60000
+cfg.PHASES.SPE2 = 36000
+cfg.PHASES.SPE3 = 36000
+cfg.PHASES.SPE4 = 25200
+
+# Phase configuration constants
+cfg.PHASES.L1 = 70
+cfg.PHASES.L2 = 150
+cfg.PHASES.L3 = 170
+cfg.PHASES.L4 = 220
 # DATA
 cfg.DATA = edict()
 cfg.DATA.MEAN = [0.485, 0.456, 0.406]
@@ -137,10 +146,10 @@ def gen_config(config_file):
 
 
 def _update_config(base_cfg, exp_cfg):
-    if isinstance(base_cfg, dict) and isinstance(exp_cfg, edict):
+    if (isinstance(base_cfg, dict) or isinstance(base_cfg, edict)) and isinstance(exp_cfg, (dict, edict)):
         for k, v in exp_cfg.items():
             if k in base_cfg:
-                if not isinstance(v, dict):
+                if not isinstance(v, (dict, edict)):
                     base_cfg[k] = v
                 else:
                     _update_config(base_cfg[k], v)
