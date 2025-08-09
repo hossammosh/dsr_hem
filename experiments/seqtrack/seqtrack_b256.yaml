@@ -49,8 +49,6 @@ TRAIN:
   BATCH_SIZE: 1
   max_epochs: 25  # Total training epochs
 
-  # Phase parameters moved to root level
-
   GRAD_CLIP_NORM: 0.1
   CE_WEIGHT: 1.0
   LR: 0.0001

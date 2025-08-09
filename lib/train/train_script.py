@@ -10,47 +10,40 @@ from lib.train.trainers import LTRTrainer
 from torch.nn.parallel import DistributedDataParallel as DDP
 # some more advanced functions
 from .base_functions import *
-# network related
 from lib.models.seqtrack import build_seqtrack
-# forward propagation related
 from lib.train.actors import SeqTrackActor
 # phase configuration related
-from lib.config.seqtrack import phases as phase_module
-from lib.config.seqtrack.phases import initialize_phases
-# for import modules
+from lib.config.seqtrack.training_phases import Phase
 import importlib
-import lib.train.data_recorder as data_recorder
 
 def run(settings):
     settings.description = 'Training script for SeqTrack'
 
-    # update the default configs with config file
+    # First, verify the config file exists
     if not os.path.exists(settings.cfg_file):
-        raise ValueError("%s doesn't exist." % settings.cfg_file)
+        raise FileNotFoundError(f"Config file not found: {settings.cfg_file}")
+    
+    # Initialize Phase object with the config file path from settings
+    settings.phase_manager = Phase(config_path=settings.cfg_file)
+    
+    # Load and update configuration
     config_module = importlib.import_module("lib.config.%s.config" % settings.script_name)
     cfg = config_module.cfg  # generate cfg from lib.config
-    config_module.update_config_from_file(settings.cfg_file)  # update cfg from experiments 123
+    config_module.update_config_from_file(settings.cfg_file)  # update cfg from experiments
     
-    # Initialize phase configurations
-    if not hasattr(cfg, 'PHASES'):
-        cfg.PHASES = edict()
-    initialize_phases(cfg.PHASES, cfg)
-
-    if settings.local_rank in [-1, 0]:
-        print("New configuration is shown below.")
-        for key in cfg.keys():
-            print("%s configuration:" % key, cfg[key])
-            print('\n')
+    # Update settings with the loaded config
     update_settings(settings, cfg)
     
-    # Print phase configurations from settings
-    if hasattr(settings, 'PHASES'):
-        print("\nPHASE CONFIGURATIONS (from settings):")
-        for phase_name, phase_cfg in settings.phases.items():
-            if hasattr(phase_cfg, 'NAME'):  # This filters out the numerical constants
-                print(f"\n{phase_name.upper()}:")
-                for key, value in phase_cfg.items():
-                    print(f"  {key}: {value}")
+    # Print configuration (excluding PHASES as it's now handled by Phase class)
+    if settings.local_rank in [-1, 0]:
+        print("\n" + "="*80)
+        print("Training Configuration:")
+        print("="*80)
+        for key in cfg.keys():
+            if key != 'PHASES':  # Skip PHASES as it's now handled by Phase class
+                print(f"{key}:")
+                print(f"  {cfg[key]}")
+        print("="*80 + "\n")
     
     log_dir = os.path.join(settings.save_dir, 'logs')
     if settings.local_rank in [-1, 0]:

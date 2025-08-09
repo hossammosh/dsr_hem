@@ -60,6 +60,7 @@ class LTRTrainer(BaseTrainer):
             data_info = data[1]
             sample_index = data[2]
             data = data[0]
+            #breakpoint()
             print(f"Processing sample {sample_index}, iteration {self.iteration_counter}", flush=True)
             if self.move_data_to_gpu:
                 data = data.to(self.device)
@@ -108,7 +109,8 @@ class LTRTrainer(BaseTrainer):
 
             # Print statistics
             self._print_stats(i, loader, batch_size)
-            if (i >= self.settings.top_selected_samples): break
+            if (i >= self.settings.phase_manager.SPE):
+                break
 
 
     def train_epoch(self):

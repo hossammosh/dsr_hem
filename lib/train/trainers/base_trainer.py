@@ -8,6 +8,7 @@ from lib.train.admin import multigpu
 from torch.utils.data.distributed import DistributedSampler
 from lib.train.run_training import init_seeds
 import lib.train.data_recorder as data_recorder
+from lib.config.seqtrack.training_phases import Phase
 
 
 class BaseTrainer:
@@ -21,84 +22,6 @@ class BaseTrainer:
                     f.write(message + '\n')
             except Exception as e:
                 print(f"Error writing to log file {self.settings.log_file}: {e}", flush=True)
-
-    def _init_phase_config(self, settings):
-        """Initialize phase configuration from settings."""
-        if not hasattr(settings, 'PHASES'):
-            raise ValueError("Phase configuration not found in settings. Please check your YAML config.")
-            
-        self.phases = settings.PHASES
-        self._validate_phases()
-        
-        # Set initial phase
-        self.current_phase = None
-        self.current_phase_name = None
-        
-    def _validate_phases(self):
-        """Validate phase configuration."""
-        required_keys = ['warmup', 'first_hem', 'remining', 'refined_hem']
-        for phase in required_keys:
-            if phase not in self.phases:
-                raise ValueError(f"Missing required phase: {phase}")
-                
-            phase_cfg = self.phases[phase]
-            if 'EPOCH_RANGE' not in phase_cfg or 'SAMPLE_PER_EPOCH' not in phase_cfg:
-                raise ValueError(f"Phase {phase} is missing required configuration (EPOCH_RANGE or SAMPLE_PER_EPOCH)")
-    
-    def get_current_phase(self, epoch):
-        """
-        Get the current phase configuration based on epoch.
-        
-        Args:
-            epoch (int): Current training epoch
-            
-        Returns:
-            tuple: (phase_name, phase_config, sample_per_epoch)
-        """
-        for phase_name, phase_cfg in self.phases.items():
-            start_epoch, end_epoch = phase_cfg['EPOCH_RANGE']
-            if start_epoch <= epoch <= end_epoch:
-                return phase_name, phase_cfg, phase_cfg['SAMPLE_PER_EPOCH']
-                
-        # If no phase matches, use the last phase's configuration
-        last_phase = list(self.phases.keys())[-1]
-        return last_phase, self.phases[last_phase], self.phases[last_phase]['SAMPLE_PER_EPOCH']
-    
-    def _handle_phase_change(self, new_phase, phase_cfg, epoch):
-        """Handle phase change and log the transition."""
-        if self.current_phase_name != new_phase:
-            self.current_phase_name = new_phase
-            self.current_phase = phase_cfg
-            
-            log_msg = (
-                f"\n{'='*80}\n"
-                f"PHASE TRANSITION\n"
-                f"Epoch: {epoch}\n"
-                f"New Phase: {phase_cfg.get('NAME', new_phase)}\n"
-                f"Epoch Range: {phase_cfg['EPOCH_RANGE']}\n"
-                f"Samples/epoch: {phase_cfg['SAMPLE_PER_EPOCH']}\n"
-                f"Description: {phase_cfg.get('DESC', '')}\n"
-                f"{'='*80}\n"
-            )
-            print(log_msg)
-            self._write_to_log(log_msg)
-            
-            # Apply phase configuration to all dataset samplers
-            self._apply_phase_to_samplers(phase_cfg)
-    
-    def _apply_phase_to_samplers(self, phase_cfg):
-        """Apply phase configuration to all dataset samplers."""
-        for loader in self.loaders:
-            if hasattr(loader, 'dataset') and hasattr(loader.dataset, 'sampler'):
-                if hasattr(loader.dataset.sampler, 'apply'):
-                    loader.dataset.sampler.apply(phase_cfg)
-                # Backward compatibility with set_phase
-                elif hasattr(loader.dataset.sampler, 'set_phase'):
-                    loader.dataset.sampler.set_phase(
-                        phase=phase_cfg.get('name', ''),
-                        epoch=self.settings.epoch,
-                        phase_cfg=phase_cfg
-                    )
     
     def __init__(self, actor, loaders, optimizer, settings, lr_scheduler=None):
         """
@@ -126,9 +49,6 @@ class BaseTrainer:
 
         self.actor.to(self.device)
         self.settings = settings
-        
-        # Initialize phase configuration
-        self._init_phase_config(settings)
 
     def update_settings(self, settings=None):
         """Updates the trainer settings. Must be called to update internal settings."""
@@ -208,24 +128,13 @@ class BaseTrainer:
                 for epoch in range(start_epoch, max_epochs + 1):
                     self.settings.epoch = epoch
                     
-                    # Get current phase configuration
-                    phase_name, phase_cfg, sample_per_epoch = self.get_current_phase(epoch)
-                    self.settings.sample_per_epoch = sample_per_epoch
+                    # Update phase based on current epoch using the existing phase_manager from settings
+                    if hasattr(self.settings, 'phase_manager') and self.settings.phase_manager is not None:
+                        self.settings.phase_manager.set_phase(epoch)
+                        print(f'Current phase: {self.settings.phase_manager.name} (Epochs {self.settings.phase_manager.Lepoch}-{self.settings.phase_manager.Hepoch}), Samples per epoch: {self.settings.phase_manager.SPE}')
                     
-                    # Handle phase transition if needed
-                    self._handle_phase_change(phase_name, phase_cfg, epoch)
-                    
-                    # Update data recorder with new epoch and sample_per_epoch
+                    # Update data recorder with new epoch
                     data_recorder.set_epoch(settings=self.settings)
-                    
-                    # Update phase in all loaders' datasets
-                    for loader in self.loaders:
-                        if hasattr(loader, 'dataset') and hasattr(loader.dataset, 'set_phase'):
-                            loader.dataset.set_phase(
-                                phase=phase_name,
-                                epoch=epoch,
-                                phase_cfg=phase_cfg
-                            )
                     
                     init_seeds(42)
                     print('epoch no.= ', epoch, " at base trainer epoch loop")
@@ -450,13 +359,13 @@ class BaseTrainer:
             os.makedirs(directory)
 
         # First save as a tmp file
-        tmp_file_path = '{}/{}_ep{:04d}.tmp'.format(directory, net_type, self.settings.epoch)
-        torch.save(state, tmp_file_path)
-
-        file_path = '{}/{}_ep{:04d}.pth.tar'.format(directory, net_type, self.settings.epoch)
+        # tmp_file_path = '{}/{}_ep{:04d}.tmp'.format(directory, net_type, self.settings.epoch)
+        # torch.save(state, tmp_file_path)
+        #
+        # file_path = '{}/{}_ep{:04d}.pth.tar'.format(directory, net_type, self.settings.epoch)
 
         # Now rename to actual checkpoint. os.rename seems to be atomic if files are on same filesystem. Not 100% sure
-        os.rename(tmp_file_path, file_path)
+        # os.rename(tmp_file_path, file_path)
 
     def load_checkpoint(self, checkpoint=None, fields=None, ignore_fields=None, load_constructor=False):
         """Loads a network checkpoint file.

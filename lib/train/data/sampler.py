@@ -38,16 +38,7 @@ class TrackingSampler(torch.utils.data.Dataset):
         self.datasets = datasets
         self.train_cls = train_cls  # whether we are training classification
         self.pos_prob = pos_prob  # probability of sampling positive class when making classification
-        self.selected_sampling = settings.selected_sampling
-        self.selected_sampling_epoch = settings.selected_sampling_epoch
         self.settings = settings
-        
-        # Initialize phase tracking
-        self.current_phase = "warmup"  # Default phase
-        self.current_epoch = 0
-        self.sample_weights = None  # Will be used for HEM phases
-        self.hard_samples = {}  # Will store hard samples for HEM phases
-        self.loss_history = {}  # Will store loss history for HEM phases
         
         if p_datasets is None:
             p_datasets = [len(d) for d in self.datasets]
@@ -62,141 +53,11 @@ class TrackingSampler(torch.utils.data.Dataset):
         self.processing = processing
         self.frame_sample_mode = frame_sample_mode
         self.row_index = -1
-
-    def apply(self, phase_config):
-        """
-        Apply phase configuration to the sampler.
-        
-        Args:
-            phase_config (dict): Contains phase settings including:
-                - name: Phase name ('warmup', 'first_hem', 'remining', 'refined_hem')
-                - EPOCH_RANGE: Tuple of (start_epoch, end_epoch)
-                - SAMPLE_PER_EPOCH: Samples per epoch
-                - HARD_SAMPLES_RATIO: Ratio of hard samples (for HEM phases)
-                - RANDOM_SAMPLES_RATIO: Ratio of random samples (for refined HEM)
-        """
-        if not phase_config:
-            return
-            
-        phase_name = phase_config.get('name', '')
-        if phase_name == self.current_phase:
-            return
-            
-        self.current_phase = phase_name
-        self.phase_cfg = phase_config
-        
-        print(f"[Sampler] Applying {phase_name} phase configuration")
-        
-        if phase_name == "warmup":
-            self._apply_warmup_phase()
-        elif phase_name == "first_hem":
-            self._apply_hem_phase(hard_ratio=0.6, random_ratio=0.0)
-        elif phase_name == "remining":
-            # Continue collecting losses without changing sampling
-            pass
-        elif phase_name == "refined_hem":
-            self._apply_hem_phase(
-                hard_ratio=phase_config.get('HARD_SAMPLES_RATIO', 0.6),
-                random_ratio=phase_config.get('RANDOM_SAMPLES_RATIO', 0.1)
-            )
-    
-    def _apply_warmup_phase(self):
-        """Apply warmup phase configuration."""
-        self.sample_weights = None  # Uniform sampling
-        self.hard_samples = {}
-        print("[Sampler] Warmup phase: Using uniform sampling")
-        
-    def _apply_hem_phase(self, hard_ratio, random_ratio=0.0):
-        """Apply HEM phase configuration with given ratios."""
-        if not hasattr(self, 'loss_history') or not self.loss_history:
-            print("[Sampler] No loss history available. Using uniform sampling.")
-            self.sample_weights = None
-            return
-            
-        # Calculate average losses
-        avg_losses = {
-            sample_id: sum(losses)/len(losses)
-            for sample_id, losses in self.loss_history.items() if losses
-        }
-        
-        if not avg_losses:
-            print("[Sampler] No valid loss data. Using uniform sampling.")
-            self.sample_weights = None
-            return
-            
-        # Sort by loss (descending) and select top samples
-        sorted_samples = sorted(avg_losses.items(), key=lambda x: x[1], reverse=True)
-        num_samples = len(sorted_samples)
-        num_hard = int(num_samples * hard_ratio)
-        selected = dict(sorted_samples[:num_hard])
-        
-        # Add random samples if needed
-        if random_ratio > 0 and num_hard < num_samples:
-            num_random = int(num_samples * random_ratio)
-            remaining = dict(sorted_samples[num_hard:])
-            selected.update(dict(random.sample(list(remaining.items()), 
-                               min(num_random, len(remaining)))))
-        
-        self.sample_weights = {k: 1.0 for k in selected}
-        print(f"[Sampler] {self.current_phase}: Using {len(self.sample_weights)} samples "
-              f"({hard_ratio*100:.0f}% hard, {random_ratio*100:.0f}% random)")
-    
-    def update_loss(self, sample_id, loss_value):
-        """Update loss history for a sample."""
-        if not hasattr(self, 'loss_history'):
-            self.loss_history = {}
-        if sample_id not in self.loss_history:
-            self.loss_history[sample_id] = []
-        self.loss_history[sample_id].append(loss_value)
-    
-    def _update_sample_weights(self, top_ratio=1.0, random_ratio=0.0):
-        """
-        Update sample weights based on the current loss history.
-        
-        Args:
-            top_ratio (float): Ratio of top hardest samples to keep (0.0 to 1.0)
-            random_ratio (float): Ratio of random samples to add (0.0 to 1.0)
-        """
-        if not hasattr(self, 'loss_history') or not self.loss_history:
-            print("[Sampler] No loss history available. Using uniform sampling.")
-            self.sample_weights = None
-            return
-            
-        # Calculate average loss per sample
-        avg_losses = {}
-        for sample_id, losses in self.loss_history.items():
-            if losses:
-                avg_losses[sample_id] = sum(losses) / len(losses)
-        
-        if not avg_losses:
-            print("[Sampler] No valid loss data. Using uniform sampling.")
-            self.sample_weights = None
-            return
-            
-        # Sort samples by average loss (descending)
-        sorted_samples = sorted(avg_losses.items(), key=lambda x: x[1], reverse=True)
-        
-        # Select top samples
-        num_top = int(len(sorted_samples) * top_ratio)
-        top_samples = dict(sorted_samples[:num_top])
-        
-        # Add random samples if needed
-        if random_ratio > 0 and random_ratio < 1.0:
-            num_random = int(len(sorted_samples) * random_ratio)
-            random_samples = dict(random.sample(sorted_samples[num_top:], min(num_random, len(sorted_samples) - num_top)))
-            top_samples.update(random_samples)
-        
-        # Update sample weights
-        self.sample_weights = {sample_id: 1.0 for sample_id in top_samples}
-        
-        print(f"[Sampler] Using {len(self.sample_weights)} samples "
-              f"({top_ratio*100:.0f}% hardest + {random_ratio*100:.0f}% random)")
-        
+        self.train_cls = train_cls  # whether we are training classification
+        self.pos_prob = pos_prob  # probability of sampling positive class when making classification
+        self.settings = settings
     def __len__(self):
         return self.samples_per_epoch
-
-
-
     def _sample_visible_ids(self, visible, num_ids=1, min_id=None, max_id=None,
                             allow_invisible=False, force_invisible=False):
         """ Samples num_ids frames between min_id and max_id for which target is visible
@@ -235,8 +96,24 @@ class TrackingSampler(torch.utils.data.Dataset):
         self.row_index += 1
         
         if self.train_cls:
-            return self.getitem_cls()
-            
+            return self.getitem_cls()  # Default return for phases 2-4
+        phase_number = self.settings.phase_manager.number
+
+        if phase_number == 1:
+            # Phase 1: Normal dataset sampling
+            v=self.getitem()
+            aa = (*v, index)
+            return aa
+        elif phase_number == 2:
+            # Phase 2: Skip
+            pass
+        elif phase_number == 3:
+            # Phase 3: Skip
+            pass
+        elif phase_number == 4:
+            # Phase 4: Skip
+            pass
+
         # Get the current phase and call the appropriate sampling function
         if not hasattr(self, 'current_phase'):
             self.current_phase = "warmup"
