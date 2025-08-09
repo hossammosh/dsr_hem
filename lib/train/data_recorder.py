@@ -61,15 +61,6 @@ def _get_tmp_filename(settings, temp):
     samples = pm.SPE
     return f'phase_{phase}_{temp}_epoch_{settings.epoch}_samples_{samples}.csv'
 
-
-# def _get_previous_filename(settings):
-#     """Generate previous phase's filename in the format: phase_{phase}_epoch_{epoch}_samples_{samples}.csv"""
-#     phase = settings.phase if hasattr(settings, 'phase') else 'train'
-#     samples = settings.sample_per_epoch if hasattr(settings, 'sample_per_epoch') else 0
-#     if settings.epoch > 1:
-#         return f'phase_{phase}_epoch_{settings.epoch-1}_samples_{samples}.csv'
-#     return None
-
 def _clean_previous_experiments():
     """Cleans up previous experiment files."""
     print("Cleaning up previous experiment files...", flush=True)
@@ -94,12 +85,6 @@ def _clean_previous_experiments():
     else:
         print("No existing files to clean up.", flush=True)
 
-
-def set_sampling(ss):
-    global select_sampling
-    select_sampling = ss
-
-
 def set_epoch(settings):
     """
     Sets the current epoch, clearing buffers and state for the new epoch.
@@ -109,7 +94,13 @@ def set_epoch(settings):
     global selected_sampling_epoch
 
     with _file_lock:
+        # Save any remaining samples from the previous epoch
+        if _buffer:
+            save_samples(settings)
+            
+        # Reset for new epoch
         _buffer = []
+        _total_samples_logged_this_epoch = 0
         current_epoch = settings.epoch
         sample_per_epoch = settings.sample_per_epoch
         selected_sampling_epoch = settings.selected_sampling_epoch
@@ -168,9 +159,7 @@ def _calculate_hardness(losses, ious, metadata):
 
     # Sort by hardness in descending order
     sample_metrics = sample_metrics.sort_values('hardness', ascending=False)
-
     return sample_metrics
-
 
 def save_samples(settings):
     """Saves all collected samples and processes phase metrics."""
@@ -197,13 +186,10 @@ def save_samples(settings):
         _loss_matrix.append(stat2d)
         iou2d = np.array([[d["stats_IoU"]] for d in _buffer])
         _iou_matrix.append(iou2d)
-
         # Clear the buffer after saving
         _buffer = []
-
     except Exception as e:
         print(f"Error saving samples: {e}", flush=True)
-
 
 def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings):
     """
@@ -251,4 +237,3 @@ def _safe_str_list(value):
         return ""
     else:
         return str(value)
-
