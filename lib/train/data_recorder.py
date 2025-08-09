@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import threading
 import glob
-
+import torch
 # --- Configuration ---
 select_sampling = False
 # --- Global State (Protected by Lock) ---
@@ -175,7 +175,7 @@ def save_samples(settings):
         print(f"Successfully saved {len(df)} samples to {filename}", flush=True)
         # Get the number of epochs and samples per epoch from phase manager
 
-        stat2d = np.array([[d['stats/Loss_total'], d['stats_IoU']] for d in _buffer])
+        stat2d = np.array([[d['stats/Loss_total']] for d in _buffer])
         _loss_matrix.append(stat2d)
         iou2d = np.array([[d["stats_IoU"]] for d in _buffer])
         _iou_matrix.append(iou2d)
@@ -193,8 +193,9 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
         sample_index: Index of the current sample
         data_info: Dictionary containing sample information
         stats: Dictionary containing sample statistics
+        settings: Training settings containing phase information
     """
-    global _buffer, _total_samples_logged_this_epoch
+    global _buffer, _total_samples_logged_this_epoch, _loss_matrix
 
     with _file_lock:
         # Create a sample entry with all required fields
@@ -221,7 +222,32 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
         # If we've collected all samples for this epoch, save them
         if _total_samples_logged_this_epoch == settings.phase_manager.SPE:
             save_samples(settings)
-        #if()
+            # Check if we've reached the end of the current phase
+            if hasattr(settings, 'phase_manager') and settings.epoch == settings.phase_manager.L:
+                # Check if we're in phase 1
+                if settings.phase_manager.number == 1 and _loss_matrix:
+                    # Convert _loss_matrix to 3D numpy array (epochs x samples x 2 for loss and IoU)
+                    loss_3d = np.array(_loss_matrix)  # Shape: (epochs, samples, 2)
+                    # Calculate average loss across epochs for each sample
+                    avg_losses = np.mean(loss_3d[:, :, 0], axis=0)  # Shape: (samples,)
+                    # Calculate 1st and 99th percentiles for losses
+                    Lmin = np.percentile(avg_losses, 1)
+                    Lmax = np.percentile(avg_losses, 99)
+                    avg_losses_tensor = torch.from_numpy(avg_losses).float()
+                    # Now use torch.clamp
+                    clipped_loss = torch.clamp(avg_losses_tensor, min=Lmin, max=Lmax).numpy()
+                    loss_norm = (clipped_loss - Lmin) / (Lmax - Lmin)
+
+                    ious_3d = np.array(_iou_matrix)
+                    # Calculate average IoU across epochs for each sample
+                    avg_ious = np.mean(loss_3d[:, :, 1], axis=0)  # Shape: (samples,)
+                    # Calculate 1st and 99th percentiles for IoUs
+                    Imin = np.percentile(avg_ious, 1)
+                    Imax = np.percentile(avg_ious, 99)
+                    avg_ious_tensor = torch.from_numpy(avg_ious).float()
+                    clipped_ious = torch.clamp(avg_ious_tensor, min=Imin, max=Imax).numpy()
+                    ious_norm = (clipped_ious - Imin) / (Imax - Imin)
+
 
 def _safe_str_list(value):
     """Safely convert lists or other types to string."""
