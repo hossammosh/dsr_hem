@@ -4,15 +4,12 @@ import os
 import pandas as pd
 import numpy as np
 import threading
-import time
-import h5py
 import glob
 
 # --- Configuration ---
 select_sampling = False
 # --- Global State (Protected by Lock) ---
 _buffer = []
-# New matrices to store loss and IoU values
 # Rows: samples, Columns: epochs
 _loss_matrix = []
 _iou_matrix = []
@@ -168,7 +165,6 @@ def save_samples(settings):
     if not _buffer:
         print("No data to save.", flush=True)
         return
-
     try:
         # Create DataFrame from the buffer
         df = pd.DataFrame(_buffer, columns=_headers)
@@ -179,15 +175,13 @@ def save_samples(settings):
         print(f"Successfully saved {len(df)} samples to {filename}", flush=True)
         # Get the number of epochs and samples per epoch from phase manager
 
-        num_epochs = settings.phase_manager.L
-        samples_per_epoch = settings.phase_manager.SPE
-        epoch = settings.epoch
         stat2d = np.array([[d['stats/Loss_total'], d['stats_IoU']] for d in _buffer])
         _loss_matrix.append(stat2d)
         iou2d = np.array([[d["stats_IoU"]] for d in _buffer])
         _iou_matrix.append(iou2d)
         # Clear the buffer after saving
         _buffer = []
+
     except Exception as e:
         print(f"Error saving samples: {e}", flush=True)
 
@@ -227,7 +221,7 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
         # If we've collected all samples for this epoch, save them
         if _total_samples_logged_this_epoch == settings.phase_manager.SPE:
             save_samples(settings)
-
+        #if()
 
 def _safe_str_list(value):
     """Safely convert lists or other types to string."""
