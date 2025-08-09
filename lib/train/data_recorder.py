@@ -18,7 +18,7 @@ _iou_matrix = None
 # These will be set in set_epoch based on phase_manager
 _max_epochs = None
 _max_samples = None
-
+_stat3d = []
 _total_samples_logged_this_epoch = 0
 current_epoch = None
 _file_lock = threading.RLock()
@@ -177,7 +177,7 @@ def _calculate_hardness(losses, ious, metadata):
 
 def save_samples(settings):
     """Saves all collected samples and processes phase metrics."""
-    global _buffer, _loss_matrix, _iou_matrix
+    global _buffer, _loss_matrix, _iou_matrix, _stat3d
     
     if not _buffer:
         print("No data to save.", flush=True)
@@ -186,66 +186,69 @@ def save_samples(settings):
     try:
         # Create DataFrame from the buffer
         df = pd.DataFrame(_buffer, columns=_headers)
-        
         # Save the main CSV file
         filename = _get_filename(settings)
         print(f"Saving {len(df)} samples to {filename}...", flush=True)
         df.to_csv(filename, index=False)
         print(f"Successfully saved {len(df)} samples to {filename}", flush=True)
         # Get the number of epochs and samples per epoch from phase manager
+
         num_epochs = settings.phase_manager.L
         samples_per_epoch = settings.phase_manager.SPE
-
+        epoch = settings.epoch
+        stat2d = np.array([[d['stats/Loss_total'], d['stats_IoU']] for d in _buffer])
+        _stat3d.append(stat2d)
         # Create empty matrix with shape (num_epochs, samples_per_epoch)
+
         _loss_matrix = np.zeros((num_epochs, samples_per_epoch))
         _iou_matrix = np.zeros((num_epochs, samples_per_epoch))
-
-        # Convert buffer to DataFrame if not already done
-        if not isinstance(_buffer, pd.DataFrame):
-            df = pd.DataFrame(_buffer)
-        else:
-            df = _buffer
-
-        # Calculate positions in the matrix
-        sample_indices = df['Sample Index'].values - 1  # Convert to 0-based
-        epoch_indices = (sample_indices // samples_per_epoch).astype(int)
-        sample_in_epoch = (sample_indices % samples_per_epoch).astype(int)
-
-        # Filter valid indices
-        valid = (epoch_indices >= 0) & (epoch_indices < num_epochs) & \
-                (sample_in_epoch >= 0) & (sample_in_epoch < samples_per_epoch)
-        
-        # Fill matrices using vectorized operations
-        _loss_matrix[epoch_indices[valid], sample_in_epoch[valid]] = df['stats/Loss_total'].values[valid]
-        _iou_matrix[epoch_indices[valid], sample_in_epoch[valid]] = df['stats_IoU'].values[valid]
+        #
+        # # Convert buffer to DataFrame if not already done
+        # if not isinstance(_buffer, pd.DataFrame):
+        #     df = pd.DataFrame(_buffer)
+        # else:
+        #     df = _buffer
+        #
+        # # Calculate positions in the matrix
+        # sample_indices = df['Sample Index'].values - 1  # Convert to 0-based
+        # epoch_indices = (sample_indices // samples_per_epoch).astype(int)
+        # sample_in_epoch = (sample_indices % samples_per_epoch).astype(int)
+        #
+        # # Filter valid indices
+        # valid = (epoch_indices >= 0) & (epoch_indices < num_epochs) & \
+        #         (sample_in_epoch >= 0) & (sample_in_epoch < samples_per_epoch)
+        #
+        # # Fill matrices using vectorized operations
+        # _loss_matrix[epoch_indices[valid], sample_in_epoch[valid]] = df['stats/Loss_total'].values[valid]
+        # _iou_matrix[epoch_indices[valid], sample_in_epoch[valid]] = df['stats_IoU'].values[valid]
 
         # Store metrics for hardness calculation
-        for idx, row in df.iterrows():
-            sample_idx = _total_samples_logged_this_epoch + idx
-            _loss_matrix[current_epoch - 1, sample_idx] = row['stats/Loss_total']
-            _iou_matrix[current_epoch - 1, sample_idx] = row['stats_IoU']
+        # for idx, row in df.iterrows():
+        #     sample_idx = _total_samples_logged_this_epoch + idx
+        #     _loss_matrix[current_epoch - 1, sample_idx] = row['stats/Loss_total']
+        #     _iou_matrix[current_epoch - 1, sample_idx] = row['stats_IoU']
         
         # If this is the last epoch of the phase, process and save hardness metrics
-        if settings.phase_manager and settings.epoch == settings.phase_manager.Hepoch:
-            print(f"Processing phase {settings.phase_manager.number} metrics...", flush=True)
-            
-            # Calculate hardness for all samples in the phase
-            phase_df = _calculate_hardness(_loss_matrix[:, :current_epoch].mean(axis=1), _iou_matrix[:, :current_epoch].mean(axis=1), df)
-            
-            if not phase_df.empty:
-                # Sort by hardness (descending) and select top SPE2 samples
-                phase_df = phase_df.sort_values('hardness', ascending=False)
-                top_samples = phase_df.head(settings.phase_manager.SPE2)
-                
-                # Save all metrics with hardness
-                metrics_file = f"phase_{settings.phase_manager.number}_metrics.csv"
-                phase_df.to_csv(metrics_file, index=False)
-                print(f"Saved phase metrics to {metrics_file}", flush=True)
-                
-                # Save top hard samples
-                hard_samples_file = f"phase_{settings.phase_manager.number}_hard_samples.csv"
-                top_samples.to_csv(hard_samples_file, index=False)
-                print(f"Saved top {len(top_samples)} hard samples to {hard_samples_file}", flush=True)
+        # if settings.phase_manager and settings.epoch == settings.phase_manager.Hepoch:
+        #     print(f"Processing phase {settings.phase_manager.number} metrics...", flush=True)
+        #
+        #     # Calculate hardness for all samples in the phase
+        #     phase_df = _calculate_hardness(_loss_matrix[:, :current_epoch].mean(axis=1), _iou_matrix[:, :current_epoch].mean(axis=1), df)
+        #
+        #     if not phase_df.empty:
+        #         # Sort by hardness (descending) and select top SPE2 samples
+        #         phase_df = phase_df.sort_values('hardness', ascending=False)
+        #         top_samples = phase_df.head(settings.phase_manager.SPE2)
+        #
+        #         # Save all metrics with hardness
+        #         metrics_file = f"phase_{settings.phase_manager.number}_metrics.csv"
+        #         phase_df.to_csv(metrics_file, index=False)
+        #         print(f"Saved phase metrics to {metrics_file}", flush=True)
+        #
+        #         # Save top hard samples
+        #         hard_samples_file = f"phase_{settings.phase_manager.number}_hard_samples.csv"
+        #         top_samples.to_csv(hard_samples_file, index=False)
+        #         print(f"Saved top {len(top_samples)} hard samples to {hard_samples_file}", flush=True)
         
         # Save a sorted copy of the current epoch's data
         # if len(df) > 0:
