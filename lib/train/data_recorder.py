@@ -30,7 +30,7 @@ BETA = 0.3  # Weight for IoU in hardness calculation
 _headers = [
     "Index", "Sample Index", "stats/Loss_total", "stats_IoU", "Seq Name",
     "Template Frame ID", "Template Frame Path", "Search Frame ID", "Seq ID",
-    "Seq Path", "Class Name", "Vid ID", "Search Names", "Search Path"
+    "Seq Path", "Class Name", "Vid ID", "Search Names", "Search Path", "Hardness_Score"
 ]
 
 
@@ -50,11 +50,10 @@ def _get_filename(settings):
     samples = pm.SPE
     return f'phase_{phase}_epoch_{settings.epoch}_samples_{samples}.csv'
 
-
 def _get_tmp_filename(settings, temp):
     pm = settings.phase_manager
     """Generate filename in the format: phase_{phase}_epoch_{epoch}_samples_{samples}.csv"""
-    phase = pm.number if hasattr(settings, 'phase') else 'train'
+    phase = pm.number
     samples = pm.SPE
     return f'phase_{phase}_{temp}_epoch_{settings.epoch}_samples_{samples}.csv'
 
@@ -92,8 +91,8 @@ def set_epoch(settings):
 
     with _file_lock:
         # Save any remaining samples from the previous epoch
-        if _buffer:
-            save_samples(settings)
+        # if _buffer:
+        #     save_samples(settings)
             
         # Reset for new epoch
         _buffer = []
@@ -175,12 +174,14 @@ def save_samples(settings):
         print(f"Successfully saved {len(df)} samples to {filename}", flush=True)
         # Get the number of epochs and samples per epoch from phase manager
 
-        stat2d = np.array([[d['stats/Loss_total']] for d in _buffer])
-        _loss_matrix.append(stat2d)
+        loss2d = np.array([[d['stats/Loss_total']] for d in _buffer])
+        _loss_matrix.append(loss2d)
+        loss2d=[]
         iou2d = np.array([[d["stats_IoU"]] for d in _buffer])
         _iou_matrix.append(iou2d)
+        iou2d=[]
         # Clear the buffer after saving
-        _buffer = []
+        #_buffer = []
 
     except Exception as e:
         print(f"Error saving samples: {e}", flush=True)
@@ -195,7 +196,7 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
         stats: Dictionary containing sample statistics
         settings: Training settings containing phase information
     """
-    global _buffer, _total_samples_logged_this_epoch, _loss_matrix
+    global _buffer, _total_samples_logged_this_epoch
 
     with _file_lock:
         # Create a sample entry with all required fields
@@ -204,16 +205,23 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
             'Sample Index': sample_index,
             'stats/Loss_total': float(stats.get('Loss/total', 0.0)),
             'stats_IoU': float(stats.get('IoU', 0.0)),
+
+            # Direct keys
             'Seq Name': _safe_str_list(data_info.get('seq_name', '')),
-            'Template Frame ID': _safe_str_list(data_info.get('template', {}).get('frame_id', '')),
-            'Template Frame Path': _safe_str_list(data_info.get('template', {}).get('frame_path', '')),
-            'Search Frame ID': _safe_str_list(data_info.get('search', {}).get('frame_id', '')),
             'Seq ID': _safe_str_list(data_info.get('seq_id', '')),
             'Seq Path': _safe_str_list(data_info.get('seq_path', '')),
             'Class Name': _safe_str_list(data_info.get('class_name', '')),
             'Vid ID': _safe_str_list(data_info.get('vid_id', '')),
-            'Search Names': _safe_str_list(data_info.get('search', {}).get('frame_name', '')),
-            'Search Path': _safe_str_list(data_info.get('search', {}).get('frame_path', ''))
+
+            # Template info (flat keys)
+            'Template Frame ID': _safe_str_list(data_info.get('template_ids', [])),
+            'Template Frame Path': _safe_str_list(data_info.get('template_path', [])),
+            'Template Frame Name': _safe_str_list(data_info.get('template_names', [])),
+
+            # Search info (flat keys)
+            'Search Frame ID': _safe_str_list(data_info.get('search_id', [])),
+            'Search Path': _safe_str_list(data_info.get('search_path', [])),
+            'Search Names': _safe_str_list(data_info.get('search_names', [])),
         }
 
         _buffer.append(sample_entry)
@@ -225,7 +233,7 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
             # Check if we've reached the end of the current phase
             if hasattr(settings, 'phase_manager') and settings.epoch == settings.phase_manager.L:
                 # Check if we're in phase 1
-                if settings.phase_manager.number == 1 and _loss_matrix:
+                if settings.phase_manager.number == 1:
                     # Convert _loss_matrix to 3D numpy array (epochs x samples x 2 for loss and IoU)
                     loss_3d = np.array(_loss_matrix)  # Shape: (epochs, samples, 2)
                     # Calculate average loss across epochs for each sample
@@ -240,13 +248,43 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
 
                     ious_3d = np.array(_iou_matrix)
                     # Calculate average IoU across epochs for each sample
-                    avg_ious = np.mean(loss_3d[:, :, 1], axis=0)  # Shape: (samples,)
+                    avg_ious = np.mean(ious_3d[:, :, 0], axis=0)  # Shape: (samples,)
                     # Calculate 1st and 99th percentiles for IoUs
                     Imin = np.percentile(avg_ious, 1)
                     Imax = np.percentile(avg_ious, 99)
                     avg_ious_tensor = torch.from_numpy(avg_ious).float()
                     clipped_ious = torch.clamp(avg_ious_tensor, min=Imin, max=Imax).numpy()
                     ious_norm = (clipped_ious - Imin) / (Imax - Imin)
+                    
+                    # Calculate hardness scores using the formula: hardness = alpha * loss_norm + beta * (1 - iou_norm)
+                    alpha = 0.7  # weight for loss component
+                    beta = 0.3   # weight for IoU component
+                    hardness_scores = alpha * loss_norm + beta * (1 - ious_norm)
+                    
+                    # Store the hardness scores in the buffer entries
+                    for i, entry in enumerate(_buffer):
+                        if i < len(hardness_scores):
+                            entry['Hardness_Score'] = float(hardness_scores[i])
+                    
+                    # Sort buffer by Hardness_Score in descending order (hardest first)
+                    _buffer.sort(key=lambda x: x.get('Hardness_Score', 0), reverse=True)
+                    
+                    # Calculate number of samples to keep based on SPE2_ratio
+                    num_samples_to_keep = int(len(_buffer) * settings.phase_manager.SPE2_ratio)
+                    
+                    # Crop the buffer to keep only the hardest samples
+                    _buffer = _buffer[:num_samples_to_keep]
+                    output_file = _get_tmp_filename(settings, 'source_phase2')
+
+                    # Create DataFrame and save to CSV
+                    df = pd.DataFrame(_buffer)
+                    df.to_csv(output_file, index=False)
+                    excel_file = output_file.replace('.csv', '.xlsx')
+                    df.to_excel(excel_file, index=False)
+                    print(f"Saved {len(df)} cropped samples to {output_file} and {excel_file}", flush=True)
+                    print(f"Saved {len(df)} cropped samples to {output_file}", flush=True)
+
+                    
 
 
 def _safe_str_list(value):
