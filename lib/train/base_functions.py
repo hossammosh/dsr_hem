@@ -26,14 +26,11 @@ def update_settings(settings, cfg):
     settings.ss_print_interval = getattr(cfg.TRAIN, "ss_print_interval")
     settings.checkpoint_save_interval = getattr(cfg.TRAIN, "checkpoint_save_interval")
     settings.selected_sampling = getattr(cfg.TRAIN, "selected_sampling", False)
-    settings.selected_sampling_epoch = getattr(cfg.TRAIN, "selected_sampling_epoch")
 
     settings.max_epochs = getattr(cfg.TRAIN, "max_epochs")
     settings.epoch = getattr(cfg.TRAIN, "epoch")
     settings.sample_per_epoch = getattr(cfg.DATA.TRAIN, "SAMPLE_PER_EPOCH")
     settings.top_sample_ratio = getattr(cfg.TRAIN, "top_sample_ratio")
-    settings.top_selected_samples = getattr(cfg.TRAIN, "top_selected_samples")
-    #settings.current_epoch = getattr(cfg.TRAIN, "current_epoch")
     settings.top_selected_samples=settings.sample_per_epoch
 
 def names2datasets(name_list: list, settings, image_loader):

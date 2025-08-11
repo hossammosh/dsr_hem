@@ -135,30 +135,6 @@ class TrackingSampler(torch.utils.data.Dataset):
         v = self.getitem()
         return (*v, index)
         
-    def _sample_first_hem(self, index):
-        """Sampling during first HEM phase."""
-        if hasattr(self.settings, 'epoch') and self.settings.epoch >= self.selected_sampling_epoch:
-            v = self.getitem_selected(self.selected_sampling, self.row_index)
-            if v is not None:  # If selected sampling was successful
-                index = v[1]['index'][0]
-                return (*v, index)
-        # Fall back to standard sampling if conditions not met
-        return self._sample_warmup(index)
-        
-    def _sample_remining(self, index):
-        """Sampling during re-mining phase."""
-        # TODO: Implement re-mining specific sampling logic
-        return self._sample_first_hem(index)  # For now, same as first HEM
-        
-    def _sample_refined_hem(self, index):
-        """Sampling during refined HEM phase."""
-        # TODO: Implement refined HEM specific sampling logic
-        return self._sample_first_hem(index)  # For now, same as first HEM
-        
-    def _sample_default(self, index):
-        """Default sampling if phase is unknown."""
-        v = self.getitem()
-        return (*v, index)
 
     def getitem_selected(self,  selected_sampling,row_index):
         #breakpoint()

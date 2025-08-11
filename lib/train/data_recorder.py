@@ -21,7 +21,6 @@ _total_samples_logged_this_epoch = 0
 current_epoch = None
 _file_lock = threading.RLock()
 sample_per_epoch = 0
-selected_sampling_epoch = 0
 
 # Hardness calculation parameters
 ALPHA = 0.7  # Weight for loss in hardness calculation
@@ -84,19 +83,13 @@ def set_epoch(settings):
     If settings.epoch is 1, also cleans up any previous experiment files.
     """
     global _buffer, _total_samples_logged_this_epoch, current_epoch, sample_per_epoch
-    global selected_sampling_epoch
 
     with _file_lock:
-        # Save any remaining samples from the previous epoch
-        # if _buffer:
-        #     save_samples(settings)
-            
         # Reset for new epoch
         _buffer = []
         _total_samples_logged_this_epoch = 0
         current_epoch = settings.epoch
         sample_per_epoch = settings.sample_per_epoch
-        selected_sampling_epoch = settings.selected_sampling_epoch
 
         if settings.epoch == 1:
             _clean_previous_experiments()
