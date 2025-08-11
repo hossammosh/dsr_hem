@@ -51,11 +51,8 @@ def _get_filename(settings):
     return f'phase_{phase}_epoch_{settings.epoch}_samples_{samples}.csv'
 
 def _get_tmp_filename(settings, temp):
-    pm = settings.phase_manager
-    """Generate filename in the format: phase_{phase}_epoch_{epoch}_samples_{samples}.csv"""
-    phase = pm.number
-    samples = pm.SPE
-    return f'phase_{phase}_{temp}_epoch_{settings.epoch}_samples_{samples}.csv'
+
+    return f'{temp}_epoch_{settings.epoch+1}.csv'
 
 def _clean_previous_experiments():
     """Cleans up previous experiment files."""
