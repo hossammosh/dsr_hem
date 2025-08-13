@@ -18,7 +18,6 @@ _max_epochs = None
 _max_samples = None
 
 _total_samples_logged_this_epoch = 0
-current_epoch = None
 _file_lock = threading.RLock()
 sample_per_epoch = 0
 
@@ -41,7 +40,6 @@ def _initialize_matrices(rows, cols):
 
 
 # --- Filename Generation ---
-# def _get_final_filename(settings):
 def _get_filename(settings):
     pm = settings.phase_manager
     """Generate filename in the format: phase_{phase}_epoch_{epoch}_samples_{samples}.csv"""
@@ -50,7 +48,6 @@ def _get_filename(settings):
     return f'phase_{phase}_epoch_{settings.epoch}_samples_{samples}.csv'
 
 def _get_tmp_filename(settings, temp):
-
     return f'{temp}_epoch_{settings.epoch+1}.csv'
 
 def _clean_previous_experiments():
@@ -82,71 +79,16 @@ def set_epoch(settings):
     Sets the current epoch, clearing buffers and state for the new epoch.
     If settings.epoch is 1, also cleans up any previous experiment files.
     """
-    global _buffer, _total_samples_logged_this_epoch, current_epoch, sample_per_epoch
+    global _buffer, _total_samples_logged_this_epoch#,  sample_per_epoch
 
     with _file_lock:
         # Reset for new epoch
         _buffer = []
         _total_samples_logged_this_epoch = 0
-        current_epoch = settings.epoch
-        sample_per_epoch = settings.sample_per_epoch
-
+        #sample_per_epoch = settings.sample_per_epoch
         if settings.epoch == 1:
             _clean_previous_experiments()
-
-
-def _calculate_hardness(losses, ious, metadata):
-    """
-    Calculate hardness scores for all samples in the phase.
-
-    Args:
-        losses: List of all loss values in the phase
-        ious: List of all IoU values in the phase
-        metadata: List of metadata dicts for each sample
-
-    Returns:
-        DataFrame with hardness scores and metadata
-    """
-    if not losses or not ious or not metadata:
-        return pd.DataFrame()
-
-    # Create DataFrame from metadata
-    df = pd.DataFrame(metadata)
-    df['loss'] = losses
-    df['iou'] = ious
-
-    # 1. Aggregate per sample (average the epoch values)
-    sample_metrics = df.groupby('sample_index').agg({
-        'loss': 'mean',
-        'iou': 'mean',
-        'seq_name': 'first',
-        'template_frame': 'first',
-        'search_frame': 'first'
-    }).reset_index()
-
-    # 2. Min-max normalization with percentile clipping (1st and 99th percentiles)
-    def normalize_with_clipping(series, lower=1, upper=99):
-        l_min = np.percentile(series, lower)
-        l_max = np.percentile(series, upper)
-        # Clip values to [l_min, l_max] range
-        clipped = np.clip(series, l_min, l_max)
-        # Normalize to [0, 1]
-        return (clipped - l_min) / (l_max - l_min + 1e-10)
-
-    # Apply normalization
-    sample_metrics['loss_norm'] = normalize_with_clipping(sample_metrics['loss'])
-    sample_metrics['iou_norm'] = normalize_with_clipping(sample_metrics['iou'])
-
-    # 3. Calculate hardness score (weighted sum of normalized loss and 1-IoU)
-    sample_metrics['hardness'] = (
-            ALPHA * sample_metrics['loss_norm'] +
-            BETA * (1 - sample_metrics['iou_norm'])
-    )
-
-    # Sort by hardness in descending order
-    sample_metrics = sample_metrics.sort_values('hardness', ascending=False)
-    return sample_metrics
-
+    #settings.phase_manager.set_phase(settings.epoch)
 def save_samples(settings):
     """Saves all collected samples and processes phase metrics."""
     global _buffer, _loss_matrix, _iou_matrix
@@ -268,11 +210,11 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
 
                     # Create DataFrame and save to CSV
                     df = pd.DataFrame(_buffer)
+                    settings.phase_manager.ds_phase2 =df
                     df.to_csv(output_file, index=False)
                     excel_file = output_file.replace('.csv', '.xlsx')
                     df.to_excel(excel_file, index=False)
                     print(f"Saved {len(df)} cropped samples to {output_file} and {excel_file}", flush=True)
-                    print(f"Saved {len(df)} cropped samples to {output_file}", flush=True)
 
                     
 

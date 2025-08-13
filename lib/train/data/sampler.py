@@ -56,6 +56,7 @@ class TrackingSampler(torch.utils.data.Dataset):
         self.train_cls = train_cls  # whether we are training classification
         self.pos_prob = pos_prob  # probability of sampling positive class when making classification
         self.settings = settings
+
     def __len__(self):
         return self.samples_per_epoch
     def _sample_visible_ids(self, visible, num_ids=1, min_id=None, max_id=None,
@@ -92,133 +93,110 @@ class TrackingSampler(torch.utils.data.Dataset):
 
         return random.choices(valid_ids, k=num_ids)
     def __getitem__(self, index):
-        #breakpoint()
+        if (self.settings.epoch == 6 and index == 19 ):
+            breakpoint()
+        # if(self.settings.epoch == 6 or self.settings.phase_manager.number == 2):
+        #         breakpoint()
         self.row_index += 1
-        
         if self.train_cls:
-            return self.getitem_cls()  # Default return for phases 2-4
+            return self.getitem_cls()
         phase_number = self.settings.phase_manager.number
-
         if phase_number == 1:
             # Phase 1: Normal dataset sampling
-            v=self.getitem()
-            aa = (*v, index)
-            return aa
+            result=self._sample_warmup(index)
         elif phase_number == 2:
-            # Phase 2: Skip
-            pass
+            result=self._sample_first_hem(index)
         elif phase_number == 3:
-            # Phase 3: Skip
-            pass
+            result = self._sample_remining(index)
         elif phase_number == 4:
-            # Phase 4: Skip
-            pass
-
-        # Get the current phase and call the appropriate sampling function
-        if not hasattr(self, 'current_phase'):
-            self.current_phase = "warmup"
-            
-        phase_handler = {
-            "warmup": self._sample_warmup,
-            "first_hem": self._sample_first_hem,
-            "remining": self._sample_remining,
-            "refined_hem": self._sample_refined_hem
-        }
-        
-        handler = phase_handler.get(self.current_phase, self._sample_default)
-        result = handler(index)
-        #breakpoint()
+            result = self._sample_refined_hem(index)
         return result
 
     def _sample_warmup(self, index):
         """Standard sampling during warmup phase."""
         v = self.getitem()
-        return (*v, index)
-        
+        result=(*v, index)
+        return result
+    def _sample_first_hem(self, index):
+        ds=self.settings.phase_manager.ds_phase2
+        row = ds.iloc[self.row_index]
+        if not row.empty:
+            template_ids = [int(x) for x in str(row.get('Template Frame ID', '0')).split(',') if x.strip().isdigit()]
+            template_names = [f"{tid:09d}.jpg" for tid in template_ids]
+            template_paths = [f"{row.get('Template Frame Path', '').rsplit('/', 1)[0]}/{name}" for name in
+                              template_names]
+            # Extract search frame information
+            search_id = [int(row.get('Search Frame ID', 0))]
+            search_name = f"{search_id[0]:09d}.jpg"
+            search_path = f"{row.get('Search Path', '').rsplit('/', 1)[0]}/{search_name}" if row.get(
+                'Search Path') else ""
+            # Extract sequence information
+            seq_name = row.get('Seq Name', '')
+            seq_path = row.get('Seq Path', '')
+            index = row.get('Index', '')
+            # Build the data_info dictionary
+            data_info = {
+                'seq_id': int(row.get('Seq ID', 0)),
+                'seq_path': seq_path,
+                'seq_name': seq_name,
+                'class_name': row.get('Class Name', 'unknown'),
+                'vid_id': str(row.get('Vid ID', '')),
+                'template_ids': template_ids,
+                'template_names': template_names,
+                'template_path': template_paths,
+                'search_id': search_id,
+                'search_names': [search_name],
+                'search_path': [search_path],
+                'index': [index]
+            }
+            breakpoint()
+            dataset=self.datasets[0]
+            try:
+                # Get sequence info
+                seq_info_dict = dataset.get_sequence_info(data_info['seq_id'])
+                # Get template frames and annotations
+                template_frames, template_anno, meta_obj_train = dataset.get_frames(
+                    data_info['seq_id'],
+                    data_info['template_ids'],
+                    seq_info_dict
+                )
+                # Get search frames and annotations
+                search_frames, search_anno, meta_obj_test = dataset.get_frames(
+                    data_info['seq_id'],
+                    data_info['search_id'],
+                    seq_info_dict
+                )
+                # Get height and width from template frames
+                H, W = template_frames[0].shape[:2] if hasattr(template_frames[0], 'shape') else (255, 255)
+                # Create masks if not present
+                template_masks = template_anno.get('mask', [torch.zeros((H, W))] * self.num_template_frames)
+                search_masks = search_anno.get('mask', [torch.zeros((H, W))] * self.num_search_frames)
+                # Create the data dictionary
+                data = TensorDict({
+                    'template_images': template_frames,
+                    'template_anno': template_anno['bbox'],
+                    'template_masks': template_masks,
+                    'search_images': search_frames,
+                    'search_anno': search_anno['bbox'],
+                    'search_masks': search_masks,
+                    'dataset': dataset.get_name(),
+                    'test_class': meta_obj_test.get('object_class_name')
+                })
+                # Apply processing
+                data = self.processing(data)
+                # Check if data is valid
+                if not data['valid']:
+                    print(f"Warning: Invalid data for row_index {self.row_index}, falling back to standard sampling")
+                    return self.getitem()
+                return data, data_info
+            except Exception as e:
+                print(f"Error in second phase  for row_index {self.row_index}: {str(e)}")
+                return self.getitem()  # Fall back to standard sampling
+            if v is not None:  # If selected sampling was successful
+                index = v[1]['index'][0]
+            result = (*v, index)
+            return result
 
-    def getitem_selected(self,  selected_sampling,row_index):
-        #breakpoint()
-        if selected_sampling and hasattr(self, 'excel_data'):
-            # Find the row where 'Sample Index' matches the provided index
-            row = self.excel_data.iloc[row_index]
-            #row=matched_row
-            if not row.empty:
-
-                template_ids = [int(x) for x in str(row.get('Template Frame ID', '0')).split(',') if x.strip().isdigit()]
-                template_names = [f"{tid:09d}.jpg" for tid in template_ids]
-                template_paths = [f"{row.get('Template Frame Path', '').rsplit('/', 1)[0]}/{name}" for name in template_names]
-                # Extract search frame information
-                search_id = [int(row.get('Search Frame ID', 0))]
-                search_name = f"{search_id[0]:09d}.jpg"
-                search_path = f"{row.get('Search Path', '').rsplit('/', 1)[0]}/{search_name}" if row.get('Search Path') else ""
-                # Extract sequence information
-                seq_name = row.get('Seq Name', '')
-                seq_path = row.get('Seq Path', '')
-                index=row.get('Index', '')
-                # Build the data_info dictionary
-                data_info = {
-                    'seq_id': int(row.get('Seq ID', 0)),
-                    'seq_path': seq_path,
-                    'seq_name': seq_name,
-                    'class_name': row.get('Class Name', 'unknown'),
-                    'vid_id': str(row.get('Vid ID', '')),
-                    'template_ids': template_ids,
-                    'template_names': template_names,
-                    'template_path': template_paths,
-                    'search_id': search_id,
-                    'search_names': [search_name],
-                    'search_path': [search_path],
-                    'index': [index]
-                }
-                dataset = None
-                for d in self.datasets:
-                    if hasattr(d, 'get_sequence_info') and d.get_sequence_info(data_info['seq_id']) is not None:
-                        dataset = d
-                        break
-                if dataset is None:
-                    print(f"Warning: Could not find dataset for sequence {data_info['seq_id']}")
-                    return self.getitem()  # Fall back to standard sampling
-                try:
-                    # Get sequence info
-                    seq_info_dict = dataset.get_sequence_info(data_info['seq_id'])
-                    # Get template frames and annotations
-                    template_frames, template_anno, meta_obj_train = dataset.get_frames(
-                        data_info['seq_id'],
-                        data_info['template_ids'],
-                        seq_info_dict
-                    )
-                    # Get search frames and annotations
-                    search_frames, search_anno, meta_obj_test = dataset.get_frames(
-                        data_info['seq_id'],
-                        data_info['search_id'],
-                        seq_info_dict
-                    )
-                    # Get height and width from template frames
-                    H, W = template_frames[0].shape[:2] if hasattr(template_frames[0], 'shape') else (255, 255)
-                    # Create masks if not present
-                    template_masks = template_anno.get('mask', [torch.zeros((H, W))] * self.num_template_frames)
-                    search_masks = search_anno.get('mask', [torch.zeros((H, W))] * self.num_search_frames)
-                    # Create the data dictionary
-                    data = TensorDict({
-                        'template_images': template_frames,
-                        'template_anno': template_anno['bbox'],
-                        'template_masks': template_masks,
-                        'search_images': search_frames,
-                        'search_anno': search_anno['bbox'],
-                        'search_masks': search_masks,
-                        'dataset': dataset.get_name(),
-                        'test_class': meta_obj_test.get('object_class_name')
-                    })
-                    # Apply processing
-                    data = self.processing(data)
-                    # Check if data is valid
-                    if not data['valid']:
-                        print(f"Warning: Invalid data for row_index {row_index}, falling back to standard sampling")
-                        return self.getitem()
-                    return data, data_info
-                except Exception as e:
-                    print(f"Error in getitem_selected for row_index {row_index}: {str(e)}")
-                    return self.getitem()  # Fall back to standard sampling
         return self.getitem()  # Fall back to standard sampling
     def getitem(self):
         """
@@ -306,6 +284,7 @@ class TrackingSampler(torch.utils.data.Dataset):
                                     'dataset': dataset.get_name(),
                                     'test_class': meta_obj_test.get('object_class_name')
                                    })
+                #breakpoint()
                 data = self.processing(data)
                 # check whether data is valid
                 valid = data['valid']
@@ -547,3 +526,9 @@ class TrackingSampler(torch.utils.data.Dataset):
                 print("too large gap")
                 print(str(gap_increase))
         return template_ids, search_id
+
+
+    def _sample_remining(self, index):
+        return self._sample_first_hem(index)  # For now, same as first HEM
+    def _sample_refined_hem(self, index):
+        return self._sample_first_hem(index)  # For now, same as first HEM

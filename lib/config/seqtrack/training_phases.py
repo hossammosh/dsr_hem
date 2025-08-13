@@ -3,7 +3,7 @@ Phase class for managing training phases in the SeqTrack model.
 This module handles phase management and automatically loads configuration from YAML.
 """
 import yaml
-import os
+import pandas as pd
 from pathlib import Path
 
 class Phase:
@@ -35,6 +35,7 @@ class Phase:
         self.SPE = 0         # Samples per epoch for this phase
         self.DESC = ""       # Description of the phase
         self.L = 0
+        self.ds_phase2=None
         
         # Set default config path if not provided
         self.config_path = config_path
@@ -96,7 +97,7 @@ class Phase:
             self.SPE = self.SPE2
             self.DESC = "Train with HEM + log per-sample loss"
             self.L = self.L2
-            
+
         elif self.L2 + 1 <= epoch <= self.L3:
             self.number = 3
             self.name = "Second HEM Phase"

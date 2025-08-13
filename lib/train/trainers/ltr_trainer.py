@@ -136,9 +136,9 @@ class LTRTrainer(BaseTrainer):
         for loader_stats in self.stats.values():
             if loader_stats is None:
                 continue
-            for stat_value in loader_stats.values():
-                if hasattr(stat_value, 'new_epoch'):
-                    stat_value.new_epoch()
+            # for stat_value in loader_stats.values():
+            #     if hasattr(stat_value, 'new_epoch'):
+            #         stat_value.new_epoch()
 
     def _write_tensorboard(self):
         if self.settings.epoch == 1:
