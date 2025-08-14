@@ -112,11 +112,8 @@ class TrackingSampler(torch.utils.data.Dataset):
             result = self._sample_refined_hem(index)
         return result
 
-    def _sample_warmup(self, index):
-        """Standard sampling during warmup phase."""
-        v = self.getitem()
-        result=(*v, index)
-        return result
+
+
     def _sample_first_hem(self, index):
         ds=self.settings.phase_manager.ds_phase2
         row = ds.iloc[self.row_index]
@@ -198,105 +195,7 @@ class TrackingSampler(torch.utils.data.Dataset):
             return result
 
         return self.getitem()  # Fall back to standard sampling
-    def getitem(self):
-        """
-        returns:
-            TensorDict - dict containing all the data blocks
-        """
-        valid = False
-        count_valid = 0
-        data_info={}
-        while not valid:
-            # Select a dataset
-            dataset = random.choices(self.datasets, self.p_datasets)[0]
-            is_video_dataset = dataset.is_video_sequence()
-            # sample a sequence from the given dataset
-            seq_id, visible, seq_info_dict = self.sample_seq_from_dataset(dataset, is_video_dataset)
-            data_info['seq_id'] = seq_id
-            data_info['seq_path'] = dataset.sequence_info['seq_path']
-            data_info['seq_name'] = dataset.sequence_info['seq_name']
-            data_info['class_name'] = dataset.sequence_info['class_name']
-            data_info['vid_id'] = dataset.sequence_info['vid_id']
 
-            if is_video_dataset:
-                template_ids = None
-                search_id = None
-                gap_increase = 0
-
-                if self.frame_sample_mode == 'causal':
-                    # Sample test and train frames in a causal manner, i.e. search_id > template_ids
-                    while search_id is None:
-                        base_frame_id = self._sample_visible_ids(visible, num_ids=1,
-                                                                 min_id=self.num_template_frames - 1,
-                                                                 max_id=len(visible) - self.num_search_frames)
-                        prev_frame_ids = self._sample_visible_ids(visible, num_ids=self.num_template_frames - 1,
-                                                                  min_id=base_frame_id[0] - self.max_gap - gap_increase,
-                                                                  max_id=base_frame_id[0])
-                        if prev_frame_ids is None:
-                            gap_increase += 5
-                            if gap_increase > 1000:
-                                print("too large gap")
-                                print(str(gap_increase))
-                            continue
-                        template_ids = base_frame_id + prev_frame_ids
-                        search_id = self._sample_visible_ids(visible, min_id=template_ids[0] + 1,
-                                                                    max_id=template_ids[
-                                                                               0] + self.max_gap + gap_increase,
-                                                                    num_ids=self.num_search_frames)
-                        # Increase gap until a frame is found
-                        gap_increase += 5
-                        if gap_increase > 1000:
-                            print("too large gap")
-                            print(str(gap_increase))
-
-                elif self.frame_sample_mode == "order":
-                    template_ids, search_id = self.get_frame_ids_order(visible)
-                elif self.frame_sample_mode == "trident" or self.frame_sample_mode == "trident_pro":
-                    template_ids, search_id = self.get_frame_ids_trident(visible)
-                elif self.frame_sample_mode == "stark":
-                    template_ids, search_id = self.get_frame_ids_stark(visible, seq_info_dict["valid"])
-                else:
-                    raise ValueError("Illegal frame sample mode")
-            else:
-                # In case of image dataset, just repeat the image to generate synthetic video
-                template_ids = [1] * self.num_template_frames
-                search_id = [1] * self.num_search_frames
-            try:
-                template_frames, template_anno, meta_obj_train = dataset.get_frames(seq_id, template_ids,seq_info_dict)
-                data_info['template_ids'] = template_ids
-                data_info['template_names'] = dataset.frames['frame_names']
-                data_info['template_path'] = dataset.frames['frame_paths']
-                search_frames, search_anno, meta_obj_test = dataset.get_frames(seq_id, search_id, seq_info_dict)
-                data_info['search_id'] = search_id
-                data_info['search_names'] = dataset.frames['frame_names']
-                data_info['search_path'] = dataset.frames['frame_paths']
-                H, W, _ = template_frames[0].shape
-                template_masks = template_anno['mask'] if 'mask' in template_anno else [torch.zeros(
-                    (H, W))] * self.num_template_frames
-                search_masks = search_anno['mask'] if 'mask' in search_anno else [torch.zeros(
-                    (H, W))] * self.num_search_frames
-                data = TensorDict({'template_images': template_frames,
-                                    'template_anno': template_anno['bbox'],
-                                    'template_masks': template_masks,
-                                    'search_images': search_frames,
-                                    'search_anno': search_anno['bbox'],
-                                    'search_masks': search_masks,
-                                    'dataset': dataset.get_name(),
-                                    'test_class': meta_obj_test.get('object_class_name')
-                                   })
-                #breakpoint()
-                data = self.processing(data)
-                # check whether data is valid
-                valid = data['valid']
-            except:
-                valid = False
-
-            count_valid += 1
-            if count_valid > 200:
-                print("too large count")
-                print(str(count_valid))
-
-        return data, data_info
     def show(self, data, strr, i):
         image = data[strr+'_images'][i]
         _, H, W = image.shape
@@ -532,3 +431,105 @@ class TrackingSampler(torch.utils.data.Dataset):
         return self._sample_first_hem(index)  # For now, same as first HEM
     def _sample_refined_hem(self, index):
         return self._sample_first_hem(index)  # For now, same as first HEM
+
+
+    def _sample_warmup(self, index):
+        """Standard sampling during warmup phase."""
+        v = self.getitem()
+        result=(*v, index)
+        return result
+
+    def getitem(self):
+        valid = False
+        count_valid = 0
+        data_info={}
+        while not valid:
+            # Select a dataset
+            dataset = random.choices(self.datasets, self.p_datasets)[0]
+            is_video_dataset = dataset.is_video_sequence()
+            # sample a sequence from the given dataset
+            seq_id, visible, seq_info_dict = self.sample_seq_from_dataset(dataset, is_video_dataset)
+            data_info['seq_id'] = seq_id
+            data_info['seq_path'] = dataset.sequence_info['seq_path']
+            data_info['seq_name'] = dataset.sequence_info['seq_name']
+            data_info['class_name'] = dataset.sequence_info['class_name']
+            data_info['vid_id'] = dataset.sequence_info['vid_id']
+
+            if is_video_dataset:
+                template_ids = None
+                search_id = None
+                gap_increase = 0
+
+                if self.frame_sample_mode == 'causal':
+                    # Sample test and train frames in a causal manner, i.e. search_id > template_ids
+                    while search_id is None:
+                        base_frame_id = self._sample_visible_ids(visible, num_ids=1,
+                                                                 min_id=self.num_template_frames - 1,
+                                                                 max_id=len(visible) - self.num_search_frames)
+                        prev_frame_ids = self._sample_visible_ids(visible, num_ids=self.num_template_frames - 1,
+                                                                  min_id=base_frame_id[0] - self.max_gap - gap_increase,
+                                                                  max_id=base_frame_id[0])
+                        if prev_frame_ids is None:
+                            gap_increase += 5
+                            if gap_increase > 1000:
+                                print("too large gap")
+                                print(str(gap_increase))
+                            continue
+                        template_ids = base_frame_id + prev_frame_ids
+                        search_id = self._sample_visible_ids(visible, min_id=template_ids[0] + 1,
+                                                                    max_id=template_ids[
+                                                                               0] + self.max_gap + gap_increase,
+                                                                    num_ids=self.num_search_frames)
+                        # Increase gap until a frame is found
+                        gap_increase += 5
+                        if gap_increase > 1000:
+                            print("too large gap")
+                            print(str(gap_increase))
+
+                elif self.frame_sample_mode == "order":
+                    template_ids, search_id = self.get_frame_ids_order(visible)
+                elif self.frame_sample_mode == "trident" or self.frame_sample_mode == "trident_pro":
+                    template_ids, search_id = self.get_frame_ids_trident(visible)
+                elif self.frame_sample_mode == "stark":
+                    template_ids, search_id = self.get_frame_ids_stark(visible, seq_info_dict["valid"])
+                else:
+                    raise ValueError("Illegal frame sample mode")
+            else:
+                # In case of image dataset, just repeat the image to generate synthetic video
+                template_ids = [1] * self.num_template_frames
+                search_id = [1] * self.num_search_frames
+            try:
+                template_frames, template_anno, meta_obj_train = dataset.get_frames(seq_id, template_ids,seq_info_dict)
+                data_info['template_ids'] = template_ids
+                data_info['template_names'] = dataset.frames['frame_names']
+                data_info['template_path'] = dataset.frames['frame_paths']
+                search_frames, search_anno, meta_obj_test = dataset.get_frames(seq_id, search_id, seq_info_dict)
+                data_info['search_id'] = search_id
+                data_info['search_names'] = dataset.frames['frame_names']
+                data_info['search_path'] = dataset.frames['frame_paths']
+                H, W, _ = template_frames[0].shape
+                template_masks = template_anno['mask'] if 'mask' in template_anno else [torch.zeros(
+                    (H, W))] * self.num_template_frames
+                search_masks = search_anno['mask'] if 'mask' in search_anno else [torch.zeros(
+                    (H, W))] * self.num_search_frames
+                data = TensorDict({'template_images': template_frames,
+                                    'template_anno': template_anno['bbox'],
+                                    'template_masks': template_masks,
+                                    'search_images': search_frames,
+                                    'search_anno': search_anno['bbox'],
+                                    'search_masks': search_masks,
+                                    'dataset': dataset.get_name(),
+                                    'test_class': meta_obj_test.get('object_class_name')
+                                   })
+                #breakpoint()
+                data = self.processing(data)
+                # check whether data is valid
+                valid = data['valid']
+            except:
+                valid = False
+
+            count_valid += 1
+            if count_valid > 200:
+                print("too large count")
+                print(str(count_valid))
+        return data, data_info
