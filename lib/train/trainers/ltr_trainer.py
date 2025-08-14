@@ -56,11 +56,13 @@ class LTRTrainer(BaseTrainer):
 
 
         for i, data in enumerate(loader, 1):
+            if(self.settings.epoch==6 and i==19):
+                breakpoint()
             self.iteration_counter += 1
             data_info = data[1]
             sample_index = data[2]
             data = data[0]
-            #breakpoint()
+
             print(f"Processing sample {sample_index}, iteration {self.iteration_counter}", flush=True)
             if self.move_data_to_gpu:
                 data = data.to(self.device)

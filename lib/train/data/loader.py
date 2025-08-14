@@ -61,13 +61,23 @@ def ltr_collate(batch):
     raise TypeError((error_msg.format(type(batch[0]))))
 
 def ltr_collate_stack1(batch):
-    #breakpoint()
+    if (isinstance(batch, list)):
+        if (len(batch) > 0):
+            if (isinstance(batch[0], tuple)):
+                if(len(batch[0]) > 1):
+                    if(isinstance(batch[0][1],dict) and len(batch[0][1])==11):
+                        if(batch[0][1]['seq_name'] == 'bicycle-12'):
+                            print("Found bicycle-12")
+                            breakpoint()
+
     if isinstance(batch[0], tuple) and len(batch[0]) == 3:
         new_batch=batch[0][0]
         data_info=batch[0][1]
         sample_index=batch[0][2]
         batch[0] = new_batch
-        return(ltr_collate_stack1(batch),data_info,sample_index)
+        k=(ltr_collate_stack1(batch),data_info,sample_index)
+        return(k)
+        #return(ltr_collate_stack1(batch),data_info,sample_index)
 
     error_msg = "batch must contain tensors, numbers, dicts or lists; found {}"
     elem_type = type(batch[0])
@@ -78,8 +88,7 @@ def ltr_collate_stack1(batch):
             storage = batch[0].storage()._new_shared(numel)
             out = batch[0].new(storage)
         return torch.stack(batch, 1, out=out.resize_(0))
-    elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
-            and elem_type.__name__ != 'string_':
+    elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' and elem_type.__name__ != 'string_':
         elem = batch[0]
         if elem_type.__name__ == 'ndarray':
             # array of string classes and object
@@ -89,7 +98,10 @@ def ltr_collate_stack1(batch):
             return torch.stack([torch.from_numpy(b) for b in batch], 1)
         if elem.shape == ():  # scalars
             py_type = float if elem.dtype.name.startswith('float') else int
-            return torch.utils.data.dataloader.numpy_type_map[elem.dtype.name](list(map(py_type, batch)))
+            #breakpoint()
+            vv=torch.utils.data.dataloader.numpy_type_map[elem.dtype.name](list(map(py_type, batch)))
+            return vv
+            #return torch.utils.data.dataloader.numpy_type_map[elem.dtype.name](list(map(py_type, batch)))
     elif isinstance(batch[0], int_classes):
         return torch.LongTensor(batch)
     elif isinstance(batch[0], float):
@@ -97,7 +109,22 @@ def ltr_collate_stack1(batch):
     elif isinstance(batch[0], string_classes):
         return batch
     elif isinstance(batch[0], TensorDict):
-        return TensorDict({key: ltr_collate_stack1([d[key] for d in batch]) for key in batch[0]})
+        # Step 1: Prepare an empty dict to store collated data
+        collated_dict = {}
+        # Step 2: Loop over each key in the first sample
+        for key in batch[0]:
+            # Step 2.1: Collect all values for this key from each sample in the batch
+            values_for_key = []
+            for d in batch:
+                values_for_key.append(d[key])  # <-- here is where `d` is each sample
+            # Step 2.2: Collate these values into one tensor
+            collated_tensor = ltr_collate_stack1(values_for_key)
+            # Step 2.3: Store in the dictionary
+            collated_dict[key] = collated_tensor
+        # Step 3: Wrap the dictionary into a TensorDict
+        collated_dict = TensorDict(collated_dict)
+        return collated_dict
+        #return TensorDict({key: ltr_collate_stack1([d[key] for d in batch]) for key in batch[0]})
     elif isinstance(batch[0], collections.Mapping):
         return {key: ltr_collate_stack1([d[key] for d in batch]) for key in batch[0]}
     elif isinstance(batch[0], TensorList):

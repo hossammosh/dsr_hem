@@ -93,10 +93,8 @@ class TrackingSampler(torch.utils.data.Dataset):
 
         return random.choices(valid_ids, k=num_ids)
     def __getitem__(self, index):
-        if (self.settings.epoch == 6 and index == 19 ):
-            breakpoint()
-        # if(self.settings.epoch == 6 or self.settings.phase_manager.number == 2):
-        #         breakpoint()
+        # if (self.settings.epoch == 6 and index == 13 ):
+        #     breakpoint()
         self.row_index += 1
         if self.train_cls:
             return self.getitem_cls()
@@ -104,8 +102,10 @@ class TrackingSampler(torch.utils.data.Dataset):
         if phase_number == 1:
             # Phase 1: Normal dataset sampling
             result=self._sample_warmup(index)
+
         elif phase_number == 2:
-            result=self._sample_first_hem(index)
+            v=self._sample_first_hem(index)
+            result = (*v, index)
         elif phase_number == 3:
             result = self._sample_remining(index)
         elif phase_number == 4:
@@ -146,10 +146,10 @@ class TrackingSampler(torch.utils.data.Dataset):
                 'template_path': template_paths,
                 'search_id': search_id,
                 'search_names': [search_name],
-                'search_path': [search_path],
-                'index': [index]
+                'search_path': [search_path]
+                #'index': [index]
             }
-            breakpoint()
+            #breakpoint()
             dataset=self.datasets[0]
             try:
                 # Get sequence info
