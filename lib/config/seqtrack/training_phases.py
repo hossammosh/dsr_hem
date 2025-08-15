@@ -36,6 +36,7 @@ class Phase:
         self.DESC = ""       # Description of the phase
         self.L = 0
         self.ds_phase2=None
+        self.ds_low_hardness = None
         
         # Set default config path if not provided
         self.config_path = config_path
@@ -66,6 +67,9 @@ class Phase:
         self.SPE2 = int(self.SPE2_ratio * self.base_samples)
         self.SPE3 = int(self.SPE3_ratio * self.base_samples)
         self.SPE4 = int(self.SPE4_ratio * self.base_samples)
+
+        self.DSLH = phases.get('DSLH', 2100)
+
         
         self.total_epochs = self.base_samples  # Use SAMPLE_PER_EPOCH as the default total number of epochs
 

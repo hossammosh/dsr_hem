@@ -68,7 +68,7 @@ def ltr_collate_stack1(batch):
                     if(isinstance(batch[0][1],dict) and len(batch[0][1])==11):
                         if(batch[0][1]['seq_name'] == 'bicycle-12'):
                             print("Found bicycle-12")
-                            breakpoint()
+                            #breakpoint()
 
     if isinstance(batch[0], tuple) and len(batch[0]) == 3:
         new_batch=batch[0][0]

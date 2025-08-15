@@ -6,6 +6,7 @@ import numpy as np
 import threading
 import glob
 import torch
+import random
 # --- Configuration ---
 select_sampling = False
 # --- Global State (Protected by Lock) ---
@@ -30,14 +31,6 @@ _headers = [
     "Template Frame ID", "Template Frame Path", "Search Frame ID", "Seq ID",
     "Seq Path", "Class Name", "Vid ID", "Search Names", "Search Path", "Hardness_Score"
 ]
-
-
-# --- Helper Functions ---
-def _initialize_matrices(rows, cols):
-    """Initialize or resize the loss and IoU matrices with the given dimensions."""
-    global _loss_matrix, _iou_matrix
-    pass
-
 
 # --- Filename Generation ---
 def _get_filename(settings):
@@ -88,7 +81,6 @@ def set_epoch(settings):
         #sample_per_epoch = settings.sample_per_epoch
         if settings.epoch == 1:
             _clean_previous_experiments()
-    #settings.phase_manager.set_phase(settings.epoch)
 def save_samples(settings):
     """Saves all collected samples and processes phase metrics."""
     global _buffer, _loss_matrix, _iou_matrix
@@ -112,9 +104,6 @@ def save_samples(settings):
         iou2d = np.array([[d["stats_IoU"]] for d in _buffer])
         _iou_matrix.append(iou2d)
         iou2d=[]
-        # Clear the buffer after saving
-        #_buffer = []
-
     except Exception as e:
         print(f"Error saving samples: {e}", flush=True)
 
@@ -203,11 +192,10 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
                     
                     # Calculate number of samples to keep based on SPE2_ratio
                     num_samples_to_keep = int(len(_buffer) * settings.phase_manager.SPE2_ratio)
-                    
                     # Crop the buffer to keep only the hardest samples
+                    dslh_samples = _buffer[num_samples_to_keep:]  # Get samples after num_samples_to_keep
                     _buffer = _buffer[:num_samples_to_keep]
                     output_file = _get_tmp_filename(settings, 'source_phase2')
-
                     # Create DataFrame and save to CSV
                     df = pd.DataFrame(_buffer)
                     settings.phase_manager.ds_phase2 =df
@@ -215,9 +203,30 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
                     excel_file = output_file.replace('.csv', '.xlsx')
                     df.to_excel(excel_file, index=False)
                     print(f"Saved {len(df)} cropped samples to {output_file} and {excel_file}", flush=True)
-
-                    
-
+                    output_file = _get_tmp_filename(settings, 'dslh_samples')
+                    df_dslh_samples = pd.DataFrame(dslh_samples)
+                    df_dslh_samples.to_csv(output_file, index=False)
+                    excel_file = output_file.replace('.csv', '.xlsx')
+                    df_dslh_samples.to_excel(excel_file, index=False)
+                    print(f"Saved {len(df_dslh_samples)} cropped samples to {output_file} and {excel_file}", flush=True)
+                    num_samples = settings.phase_manager.DSLH
+                    # Select random indices
+                    dslh_ss_indices = np.random.randint(0, len(dslh_samples), size=num_samples).tolist()
+                    settings.phase_manager.dslh_ss = np.array(dslh_samples)[dslh_ss_indices]
+                    print(f"Selected {len(settings.phase_manager.dslh_ss)} random samples from ds_low_hardness_samples (DSLH={settings.phase_manager.DSLH})")
+                    output_file_dslh_ss = _get_tmp_filename(settings, 'dslh_ss')
+                    dslh_ss = pd.DataFrame(settings.phase_manager.dslh_ss)
+                    dslh_ss.to_csv(output_file_dslh_ss, index=False)
+                    excel_file = output_file_dslh_ss.replace('.csv', '.xlsx')
+                    dslh_ss.to_excel(excel_file, index=False)
+                    combined_dslh = pd.concat([dslh_ss, df_dslh_samples], ignore_index=True)
+                    output_file_combined = _get_tmp_filename(settings, 'combined_dslh_source_phase4')
+                    combined_dslh.to_csv(output_file_combined, index=False)
+                    excel_file_combined = output_file_combined.replace('.csv', '.xlsx')
+                    combined_dslh.to_excel(excel_file_combined, index=False)
+                    print(
+                        f"Saved {len(combined_dslh)} combined DSLH samples to {output_file_combined} and {excel_file_combined}",
+                        flush=True)
 
 def _safe_str_list(value):
     """Safely convert lists or other types to string."""

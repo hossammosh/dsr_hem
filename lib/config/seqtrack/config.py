@@ -63,6 +63,7 @@ cfg.PHASES.L1 = 70
 cfg.PHASES.L2 = 150
 cfg.PHASES.L3 = 170
 cfg.PHASES.L4 = 220
+cfg.PHASES.DSLH = 2100
 # DATA
 cfg.DATA = edict()
 cfg.DATA.MEAN = [0.485, 0.456, 0.406]

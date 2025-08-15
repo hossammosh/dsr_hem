@@ -107,7 +107,8 @@ class TrackingSampler(torch.utils.data.Dataset):
             v=self._sample_first_hem(index)
             result = (*v, index)
         elif phase_number == 3:
-            result = self._sample_remining(index)
+            v = self._sample_remining(index)
+            result = (*v, index)
         elif phase_number == 4:
             result = self._sample_refined_hem(index)
         return result
@@ -188,11 +189,11 @@ class TrackingSampler(torch.utils.data.Dataset):
                 return data, data_info
             except Exception as e:
                 print(f"Error in second phase  for row_index {self.row_index}: {str(e)}")
-                return self.getitem()  # Fall back to standard sampling
-            if v is not None:  # If selected sampling was successful
-                index = v[1]['index'][0]
-            result = (*v, index)
-            return result
+            #     return self.getitem()  # Fall back to standard sampling
+            # if v is not None:  # If selected sampling was successful
+            #     index = v[1]['index'][0]
+            # result = (*v, index)
+            # return result
 
         return self.getitem()  # Fall back to standard sampling
 
