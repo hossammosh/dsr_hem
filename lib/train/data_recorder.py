@@ -220,7 +220,7 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
                     excel_file = output_file_dslh_ss.replace('.csv', '.xlsx')
                     dslh_ss.to_excel(excel_file, index=False)
                     combined_dslh = pd.concat([dslh_ss, df_dslh_samples], ignore_index=True)
-                    settings.phase_manager.dslh_ss_combined = combined_dslh
+                    settings.phase_manager.ds_phase4 = combined_dslh
                     output_file_combined = _get_tmp_filename(settings, 'combined_dslh_source_phase4')
                     combined_dslh.to_csv(output_file_combined, index=False)
                     excel_file_combined = output_file_combined.replace('.csv', '.xlsx')
