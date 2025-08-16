@@ -100,7 +100,6 @@ class TrackingSampler(torch.utils.data.Dataset):
         if phase_number == 1:
             # Phase 1: Normal dataset sampling
             result=self._sample_warmup(index)
-
         elif phase_number == 2:
             v=self._sample_first_hem(index)
             result = (*v, index)
@@ -413,20 +412,16 @@ class TrackingSampler(torch.utils.data.Dataset):
                 print("too large gap")
                 print(str(gap_increase))
         return template_ids, search_id
-
-
     def _sample_remining(self, index):
         return self._sample_first_hem(index)  # For now, same as first HEM
     def _sample_refined_hem(self, index):
         return self._sample_first_hem(index)  # For now, same as first HEM
-
 
     def _sample_warmup(self, index):
         """Standard sampling during warmup phase."""
         v = self.getitem()
         result=(*v, index)
         return result
-
     def getitem(self):
         valid = False
         count_valid = 0
