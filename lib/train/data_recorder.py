@@ -212,7 +212,7 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
                     num_samples = settings.phase_manager.DSLH
                     # Select random indices
                     dslh_ss_indices = np.random.randint(0, len(dslh_samples), size=num_samples).tolist()
-                    settings.phase_manager.dslh_ss = np.array(dslh_samples)[dslh_ss_indices]
+                    settings.phase_manager.dslh_ss = df_dslh_samples.loc[dslh_ss_indices]
                     print(f"Selected {len(settings.phase_manager.dslh_ss)} random samples from ds_low_hardness_samples (DSLH={settings.phase_manager.DSLH})")
                     output_file_dslh_ss = _get_tmp_filename(settings, 'dslh_ss')
                     dslh_ss = pd.DataFrame(settings.phase_manager.dslh_ss)
@@ -220,6 +220,7 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
                     excel_file = output_file_dslh_ss.replace('.csv', '.xlsx')
                     dslh_ss.to_excel(excel_file, index=False)
                     combined_dslh = pd.concat([dslh_ss, df_dslh_samples], ignore_index=True)
+                    settings.phase_manager.dslh_ss_combined = combined_dslh
                     output_file_combined = _get_tmp_filename(settings, 'combined_dslh_source_phase4')
                     combined_dslh.to_csv(output_file_combined, index=False)
                     excel_file_combined = output_file_combined.replace('.csv', '.xlsx')
@@ -227,6 +228,7 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
                     print(
                         f"Saved {len(combined_dslh)} combined DSLH samples to {output_file_combined} and {excel_file_combined}",
                         flush=True)
+
 
 def _safe_str_list(value):
     """Safely convert lists or other types to string."""
