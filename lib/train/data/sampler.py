@@ -93,8 +93,6 @@ class TrackingSampler(torch.utils.data.Dataset):
 
         return random.choices(valid_ids, k=num_ids)
     def __getitem__(self, index):
-        # if (self.settings.epoch == 6 and index == 13 ):
-        #     breakpoint()
         self.row_index += 1
         if self.train_cls:
             return self.getitem_cls()
@@ -112,9 +110,6 @@ class TrackingSampler(torch.utils.data.Dataset):
         elif phase_number == 4:
             result = self._sample_refined_hem(index)
         return result
-
-
-
     def _sample_first_hem(self, index):
         ds=self.settings.phase_manager.ds_phase2
         row = ds.iloc[self.row_index]
@@ -189,13 +184,6 @@ class TrackingSampler(torch.utils.data.Dataset):
                 return data, data_info
             except Exception as e:
                 print(f"Error in second phase  for row_index {self.row_index}: {str(e)}")
-            #     return self.getitem()  # Fall back to standard sampling
-            # if v is not None:  # If selected sampling was successful
-            #     index = v[1]['index'][0]
-            # result = (*v, index)
-            # return result
-
-        return self.getitem()  # Fall back to standard sampling
 
     def show(self, data, strr, i):
         image = data[strr+'_images'][i]
@@ -303,7 +291,6 @@ class TrackingSampler(torch.utils.data.Dataset):
         return torch.tensor([int(cx-w/2), int(cy-h/2), int(w), int(h)])
 
     def sample_seq_from_dataset(self, dataset, is_video_dataset):
-
         # Sample a sequence with enough visible frames
         enough_visible_frames = False
         #add by chenxin to debug
