@@ -56,7 +56,7 @@ class LTRTrainer(BaseTrainer):
 
 
         for i, data in enumerate(loader, 1):
-            if(self.settings.epoch==6 and i==19):
+            if(self.settings.epoch==16):
                 breakpoint()
             self.iteration_counter += 1
             data_info = data[1]

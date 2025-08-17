@@ -72,13 +72,13 @@ def set_epoch(settings):
     Sets the current epoch, clearing buffers and state for the new epoch.
     If settings.epoch is 1, also cleans up any previous experiment files.
     """
-    global _buffer, _total_samples_logged_this_epoch#,  sample_per_epoch
+    global _buffer, _total_samples_logged_this_epoch
 
     with _file_lock:
         # Reset for new epoch
         _buffer = []
         _total_samples_logged_this_epoch = 0
-        #sample_per_epoch = settings.sample_per_epoch
+
         if settings.epoch == 1:
             _clean_previous_experiments()
 def save_samples(settings):
@@ -189,12 +189,10 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
                     
                     # Sort buffer by Hardness_Score in descending order (hardest first)
                     _buffer.sort(key=lambda x: x.get('Hardness_Score', 0), reverse=True)
-                    
-                    # Calculate number of samples to keep based on SPE2_ratio
                     num_samples_to_keep = int(len(_buffer) * settings.phase_manager.SPE2_ratio)
-                    # Crop the buffer to keep only the hardest samples
-                    dslh_samples = _buffer[num_samples_to_keep:]  # Get samples after num_samples_to_keep
+                    _buffer_copy=_buffer
                     _buffer = _buffer[:num_samples_to_keep]
+
                     output_file = _get_tmp_filename(settings, 'source_phase2')
                     # Create DataFrame and save to CSV
                     df = pd.DataFrame(_buffer)
@@ -203,25 +201,28 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
                     excel_file = output_file.replace('.csv', '.xlsx')
                     df.to_excel(excel_file, index=False)
                     print(f"Saved {len(df)} cropped samples to {output_file} and {excel_file}", flush=True)
-                    output_file = _get_tmp_filename(settings, 'dslh_samples')
-                    df_dslh_samples = pd.DataFrame(dslh_samples)
-                    df_dslh_samples.to_csv(output_file, index=False)
+
+                    output_file = _get_tmp_filename(settings, 'low hardening samples 40%')
+                    dslh_samples = _buffer_copy[num_samples_to_keep:]  # Get samples after num_samples_to_keep
+                    dslh_samples = pd.DataFrame(dslh_samples)
+                    dslh_samples.to_csv(output_file, index=False)
                     excel_file = output_file.replace('.csv', '.xlsx')
-                    df_dslh_samples.to_excel(excel_file, index=False)
-                    print(f"Saved {len(df_dslh_samples)} cropped samples to {output_file} and {excel_file}", flush=True)
-                    num_samples = settings.phase_manager.DSLH
-                    # Select random indices
-                    dslh_ss_indices = np.random.randint(0, len(dslh_samples), size=num_samples).tolist()
-                    settings.phase_manager.dslh_ss = df_dslh_samples.loc[dslh_ss_indices]
+                    dslh_samples.to_excel(excel_file, index=False)
+                    print(f"Saved {len(dslh_samples)} cropped samples to {output_file} and {excel_file}", flush=True)
+
+                    diversity_samples = settings.phase_manager.DSLH
+                    dslh_ss_indices = np.random.randint(0, len(dslh_samples), size=diversity_samples).tolist()
+                    settings.phase_manager.dslh_ss = dslh_samples.loc[dslh_ss_indices]
                     print(f"Selected {len(settings.phase_manager.dslh_ss)} random samples from ds_low_hardness_samples (DSLH={settings.phase_manager.DSLH})")
-                    output_file_dslh_ss = _get_tmp_filename(settings, 'dslh_ss')
+                    output_file_dslh_ss = _get_tmp_filename(settings, 'data set low hardness diversity samples')
                     dslh_ss = pd.DataFrame(settings.phase_manager.dslh_ss)
                     dslh_ss.to_csv(output_file_dslh_ss, index=False)
                     excel_file = output_file_dslh_ss.replace('.csv', '.xlsx')
                     dslh_ss.to_excel(excel_file, index=False)
-                    combined_dslh = pd.concat([dslh_ss, df_dslh_samples], ignore_index=True)
+
+                    combined_dslh = pd.concat([df, dslh_ss], ignore_index=True)
                     settings.phase_manager.ds_phase4 = combined_dslh
-                    output_file_combined = _get_tmp_filename(settings, 'combined_dslh_source_phase4')
+                    output_file_combined = _get_tmp_filename(settings, 'combined_data_set_source_phase4')
                     combined_dslh.to_csv(output_file_combined, index=False)
                     excel_file_combined = output_file_combined.replace('.csv', '.xlsx')
                     combined_dslh.to_excel(excel_file_combined, index=False)
