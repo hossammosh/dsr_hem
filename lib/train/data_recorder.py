@@ -48,8 +48,14 @@ def _clean_previous_experiments():
     print("Cleaning up previous experiment files...", flush=True)
 
     # Define file patterns to search for
-    file_pattern = "phase_*_epoch_*_samples_*.csv"
-    existing_files = glob.glob(file_pattern)
+    file_patterns = [
+        "phase_*_epoch_*_samples_*.csv",
+        "source_phase2_epoch_*.xlsx",
+        "source_phase4_epoch_*.xlsx"
+    ]
+    existing_files = []
+    for pattern in file_patterns:
+        existing_files.extend(glob.glob(pattern))
 
     # Print the list of existing files
     if existing_files:
