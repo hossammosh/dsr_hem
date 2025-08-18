@@ -108,32 +108,19 @@ def save_samples(settings):
         print(f"Error saving samples: {e}", flush=True)
 
 def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings):
-    """
-    Save sample statistics to the buffer for later logging to CSV.
-
-    Args:
-        sample_index: Index of the current sample
-        data_info: Dictionary containing sample information
-        stats: Dictionary containing sample statistics
-        settings: Training settings containing phase information
-    """
-    global _buffer, _total_samples_logged_this_epoch
-
+    global _buffer, _total_samples_logged_this_epoch, _loss_matrix, _iou_matrix
     with _file_lock:
-        # Create a sample entry with all required fields
         sample_entry = {
             'Index': _total_samples_logged_this_epoch + 1,  # Changed to start from 1
             'Sample Index': sample_index,
             'stats/Loss_total': float(stats.get('Loss/total', 0.0)),
             'stats_IoU': float(stats.get('IoU', 0.0)),
-
             # Direct keys
             'Seq Name': _safe_str_list(data_info.get('seq_name', '')),
             'Seq ID': _safe_str_list(data_info.get('seq_id', '')),
             'Seq Path': _safe_str_list(data_info.get('seq_path', '')),
             'Class Name': _safe_str_list(data_info.get('class_name', '')),
             'Vid ID': _safe_str_list(data_info.get('vid_id', '')),
-
             # Template info (flat keys)
             'Template Frame ID': _safe_str_list(data_info.get('template_ids', [])),
             'Template Frame Path': _safe_str_list(data_info.get('template_path', [])),
@@ -144,92 +131,64 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
             'Search Path': _safe_str_list(data_info.get('search_path', [])),
             'Search Names': _safe_str_list(data_info.get('search_names', [])),
         }
-
         _buffer.append(sample_entry)
         _total_samples_logged_this_epoch += 1
 
-        # If we've collected all samples for this epoch, save them
         if _total_samples_logged_this_epoch == settings.phase_manager.SPE:
             save_samples(settings)
             # Check if we've reached the end of the current phase
-            if hasattr(settings, 'phase_manager') and settings.epoch == settings.phase_manager.L:
-                # Check if we're in phase 1
-                if settings.phase_manager.number == 1:
-                    # Convert _loss_matrix to 3D numpy array (epochs x samples x 2 for loss and IoU)
-                    loss_3d = np.array(_loss_matrix)  # Shape: (epochs, samples, 2)
-                    # Calculate average loss across epochs for each sample
-                    avg_losses = np.mean(loss_3d[:, :, 0], axis=0)  # Shape: (samples,)
-                    # Calculate 1st and 99th percentiles for losses
-                    Lmin = np.percentile(avg_losses, 1)
-                    Lmax = np.percentile(avg_losses, 99)
-                    avg_losses_tensor = torch.from_numpy(avg_losses).float()
-                    # Now use torch.clamp
-                    clipped_loss = torch.clamp(avg_losses_tensor, min=Lmin, max=Lmax).numpy()
-                    loss_norm = (clipped_loss - Lmin) / (Lmax - Lmin)
 
-                    ious_3d = np.array(_iou_matrix)
-                    # Calculate average IoU across epochs for each sample
-                    avg_ious = np.mean(ious_3d[:, :, 0], axis=0)  # Shape: (samples,)
-                    # Calculate 1st and 99th percentiles for IoUs
-                    Imin = np.percentile(avg_ious, 1)
-                    Imax = np.percentile(avg_ious, 99)
-                    avg_ious_tensor = torch.from_numpy(avg_ious).float()
-                    clipped_ious = torch.clamp(avg_ious_tensor, min=Imin, max=Imax).numpy()
-                    ious_norm = (clipped_ious - Imin) / (Imax - Imin)
-                    
-                    # Calculate hardness scores using the formula: hardness = alpha * loss_norm + beta * (1 - iou_norm)
-                    alpha = 0.7  # weight for loss component
-                    beta = 0.3   # weight for IoU component
-                    hardness_scores = alpha * loss_norm + beta * (1 - ious_norm)
-                    
-                    # Store the hardness scores in the buffer entries
-                    for i, entry in enumerate(_buffer):
-                        if i < len(hardness_scores):
-                            entry['Hardness_Score'] = float(hardness_scores[i])
-                    
-                    # Sort buffer by Hardness_Score in descending order (hardest first)
-                    _buffer.sort(key=lambda x: x.get('Hardness_Score', 0), reverse=True)
-                    num_samples_to_keep = int(len(_buffer) * settings.phase_manager.SPE2_ratio)
-                    _buffer_copy=_buffer
-                    _buffer = _buffer[:num_samples_to_keep]
+            if settings.epoch == settings.phase_manager.L1:
+                hardness_scores = calculate_hardness_scores(settings, _loss_matrix, _iou_matrix, alpha=0.7, beta=0.3)
+                _loss_matrix = []
+                _iou_matrix = []
+                for i, entry in enumerate(_buffer):
+                    if i < len(hardness_scores):
+                        entry['Hardness_Score'] = float(hardness_scores[i])
 
-                    output_file = _get_tmp_filename(settings, 'source_phase2')
-                    # Create DataFrame and save to CSV
-                    df = pd.DataFrame(_buffer)
-                    settings.phase_manager.ds_phase2 =df
-                    df.to_csv(output_file, index=False)
-                    excel_file = output_file.replace('.csv', '.xlsx')
-                    df.to_excel(excel_file, index=False)
-                    print(f"Saved {len(df)} cropped samples to {output_file} and {excel_file}", flush=True)
+                _buffer.sort(key=lambda x: x.get('Hardness_Score', 0), reverse=True)
+                _buffer_copy = _buffer
+                _buffer = _buffer[:settings.phase_manager.SPE2]
+                df = pd.DataFrame(_buffer)
+                settings.phase_manager.ds_phase2 = df
+                settings.phase_manager.dslh = pd.DataFrame(_buffer_copy[settings.phase_manager.SPE2:])
+                output_file = _get_tmp_filename(settings, 'source_phase2')
+                excel_file = output_file.replace('.csv', '.xlsx')
+                df.to_excel(excel_file, index=False)
+                output_file = _get_tmp_filename(settings, 'first_stage_low_hardness_samples')
+                excel_file = output_file.replace('.csv', '.xlsx')
+                settings.phase_manager.dslh.to_excel(excel_file, index=False)
+#########  ******************* 3 Phase
 
-                    output_file = _get_tmp_filename(settings, 'low hardening samples 40%')
-                    dslh_samples = _buffer_copy[num_samples_to_keep:]  # Get samples after num_samples_to_keep
-                    dslh_samples = pd.DataFrame(dslh_samples)
-                    dslh_samples.to_csv(output_file, index=False)
-                    excel_file = output_file.replace('.csv', '.xlsx')
-                    dslh_samples.to_excel(excel_file, index=False)
-                    print(f"Saved {len(dslh_samples)} cropped samples to {output_file} and {excel_file}", flush=True)
+            if settings.epoch == settings.phase_manager.L3:
+                hardness_scores = calculate_hardness_scores(settings, _loss_matrix, _iou_matrix, alpha=0.7, beta=0.3)
+                _loss_matrix = []
+                _iou_matrix = []
+                for i, entry in enumerate(_buffer):
+                    if i < len(hardness_scores):
+                        entry['Hardness_Score'] = float(hardness_scores[i])
+                diversity_samples = settings.phase_manager.DSLH
+                dslh_ss_indices = np.random.randint(0, len(settings.phase_manager.dslh),
+                                                    size=diversity_samples).tolist()
+                dslh_ss=settings.phase_manager.dslh_ss = settings.phase_manager.dslh.loc[dslh_ss_indices]
 
-                    diversity_samples = settings.phase_manager.DSLH
-                    dslh_ss_indices = np.random.randint(0, len(dslh_samples), size=diversity_samples).tolist()
-                    settings.phase_manager.dslh_ss = dslh_samples.loc[dslh_ss_indices]
-                    print(f"Selected {len(settings.phase_manager.dslh_ss)} random samples from ds_low_hardness_samples (DSLH={settings.phase_manager.DSLH})")
-                    output_file_dslh_ss = _get_tmp_filename(settings, 'data set low hardness diversity samples')
-                    dslh_ss = pd.DataFrame(settings.phase_manager.dslh_ss)
-                    dslh_ss.to_csv(output_file_dslh_ss, index=False)
-                    excel_file = output_file_dslh_ss.replace('.csv', '.xlsx')
-                    dslh_ss.to_excel(excel_file, index=False)
+                output_file = _get_tmp_filename(settings, '3rd_stage_diverse_samples_from_phase1')
+                excel_file = output_file.replace('.csv', '.xlsx')
+                dslh_ss.to_excel(excel_file, index=False)
 
-                    combined_dslh = pd.concat([df, dslh_ss], ignore_index=True)
-                    settings.phase_manager.ds_phase4 = combined_dslh
-                    output_file_combined = _get_tmp_filename(settings, 'combined_data_set_source_phase4')
-                    combined_dslh.to_csv(output_file_combined, index=False)
-                    excel_file_combined = output_file_combined.replace('.csv', '.xlsx')
-                    combined_dslh.to_excel(excel_file_combined, index=False)
-                    print(
-                        f"Saved {len(combined_dslh)} combined DSLH samples to {output_file_combined} and {excel_file_combined}",
-                        flush=True)
+                _buffer.sort(key=lambda x: x.get('Hardness_Score', 0), reverse=True)
+                _buffer = _buffer[:settings.phase_manager.SPE4]
+                df = pd.DataFrame(_buffer)
 
+                output_file = _get_tmp_filename(settings, '3rd_stage_top_hardness_samples')
+                excel_file = output_file.replace('.csv', '.xlsx')
+                df.to_excel(excel_file, index=False)
+
+                df=pd.concat ([df, dslh_ss], ignore_index=True)
+                settings.phase_manager.ds_phase4 = df
+                output_file = _get_tmp_filename(settings, 'source_phase4')
+                excel_file = output_file.replace('.csv', '.xlsx')
+                df.to_excel(excel_file, index=False)
 
 def _safe_str_list(value):
     """Safely convert lists or other types to string."""
@@ -239,3 +198,24 @@ def _safe_str_list(value):
         return ""
     else:
         return str(value)
+
+def calculate_hardness_scores(settings,_loss_matrix, _iou_matrix, alpha=0.7, beta=0.3):
+        # if settings.phase_manager.number == 1 or settings.phase_manager.number == 3:
+        avg_losses = np.mean(np.array(_loss_matrix).squeeze(), axis=0)
+        Lmin = np.percentile(avg_losses, 1)
+        Lmax = np.percentile(avg_losses, 99)
+        avg_losses_tensor = torch.from_numpy(avg_losses).float()
+        # Now use torch.clamp
+        clipped_loss = torch.clamp(avg_losses_tensor, min=Lmin, max=Lmax).numpy()
+        loss_norm = (clipped_loss - Lmin) / (Lmax - Lmin)
+
+        ious_3d = np.array(_iou_matrix)
+        avg_ious = np.mean(ious_3d[:, :, 0], axis=0)  # Shape: (samples,)
+        Imin = np.percentile(avg_ious, 1)
+        Imax = np.percentile(avg_ious, 99)
+        avg_ious_tensor = torch.from_numpy(avg_ious).float()
+        clipped_ious = torch.clamp(avg_ious_tensor, min=Imin, max=Imax).numpy()
+        ious_norm = (clipped_ious - Imin) / (Imax - Imin)
+        hardness_scores = alpha * loss_norm + beta * (1 - ious_norm)
+
+        return hardness_scores

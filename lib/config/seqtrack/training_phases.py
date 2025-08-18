@@ -60,16 +60,16 @@ class Phase:
         self.SPE1_ratio = phases.get('SPE1', 1.0)
         self.SPE2_ratio = phases.get('SPE2', 0.6)
         self.SPE3_ratio = phases.get('SPE3', 0.6)
-        self.SPE4_ratio = phases.get('SPE4', 0.25)
+        self.SPE4_ratio = phases.get('SPE4', 0.6)
         
         # Calculate actual sample counts
         self.SPE1 = int(self.SPE1_ratio * self.base_samples)
         self.SPE2 = int(self.SPE2_ratio * self.base_samples)
         self.SPE3 = int(self.SPE3_ratio * self.base_samples)
-        self.SPE4 = int(self.SPE4_ratio * self.base_samples)
+        self.SPE4 = int(self.SPE4_ratio * self.SPE3)
 
         self.DSLH = phases.get('DSLH', 2100)
-
+        #self.SPE4 = int(self.SPE4_ratio * self.base_samples)+self.DSLH
         
         self.total_epochs = self.base_samples  # Use SAMPLE_PER_EPOCH as the default total number of epochs
 
@@ -116,15 +116,6 @@ class Phase:
             self.name = "Final HEM Phase"
             self.Lepoch = self.L3 + 1
             self.Hepoch = self.L4
-            self.SPE = self.SPE4
+            self.SPE = self.SPE4+self.DSLH
             self.DESC = "Train with HEM + log per-sample loss"
-            self.L = self.L4
-        else:
-            # Default to phase 4 if beyond defined phases
-            self.number = 4
-            self.name = "Extended Final Phase"
-            self.Lepoch = self.L4 + 1
-            self.Hepoch = float('inf')
-            self.SPE = self.SPE4
-            self.DESC = "Continue training with final phase settings"
             self.L = self.L4

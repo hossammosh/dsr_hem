@@ -10,7 +10,6 @@ from lib.train.run_training import init_seeds
 import lib.train.data_recorder as data_recorder
 from lib.config.seqtrack.training_phases import Phase
 
-
 class BaseTrainer:
     """Base trainer class with phase-aware training."""
 
@@ -294,7 +293,7 @@ class BaseTrainer:
             log_entries.append(f"Optimizer class: {self.optimizer.__class__.__name__}")
             log_entries.append(f"Number of parameter groups: {len(optimizer_state['param_groups'])}")
 
-            # Log learning rate for each parameter group
+            #Log learning rate for each parameter group
             for i, group in enumerate(optimizer_state['param_groups']):
                 log_entries.append(
                     f"  Group {i} - lr: {group.get('lr', 'N/A')}, weight_decay: {group.get('weight_decay', 'N/A')}")
@@ -359,13 +358,13 @@ class BaseTrainer:
             os.makedirs(directory)
 
         # First save as a tmp file
-        # tmp_file_path = '{}/{}_ep{:04d}.tmp'.format(directory, net_type, self.settings.epoch)
-        # torch.save(state, tmp_file_path)
-        #
-        # file_path = '{}/{}_ep{:04d}.pth.tar'.format(directory, net_type, self.settings.epoch)
+        tmp_file_path = '{}/{}_ep{:04d}.tmp'.format(directory, net_type, self.settings.epoch)
+        torch.save(state, tmp_file_path)
 
-        # Now rename to actual checkpoint. os.rename seems to be atomic if files are on same filesystem. Not 100% sure
-        # os.rename(tmp_file_path, file_path)
+        file_path = '{}/{}_ep{:04d}.pth.tar'.format(directory, net_type, self.settings.epoch)
+
+        #Now rename to actual checkpoint. os.rename seems to be atomic if files are on same filesystem. Not 100% sure
+        os.rename(tmp_file_path, file_path)
 
     def load_checkpoint(self, checkpoint=None, fields=None, ignore_fields=None, load_constructor=False):
         """Loads a network checkpoint file.

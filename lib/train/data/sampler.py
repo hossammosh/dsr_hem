@@ -107,6 +107,7 @@ class TrackingSampler(torch.utils.data.Dataset):
             v = self._sample_remining(index)
             result = (*v, index)
         elif phase_number == 4:
+            #breakpoint()
             v = self._sample_refined_hem(index)
             result = (*v, index)
         return result

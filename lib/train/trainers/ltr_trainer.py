@@ -56,8 +56,8 @@ class LTRTrainer(BaseTrainer):
 
 
         for i, data in enumerate(loader, 1):
-            if(self.settings.epoch==16):
-                breakpoint()
+            # if(self.settings.epoch==17):
+            #     breakpoint()
             self.iteration_counter += 1
             data_info = data[1]
             sample_index = data[2]
@@ -81,14 +81,14 @@ class LTRTrainer(BaseTrainer):
                     stats=stats,
                     settings=self.settings
                 )
-                print(f"Successfully saved sample {sample_index} to buffer", flush=True)
+                #print(f"Successfully saved sample {sample_index} to buffer", flush=True)
                 print(f"Current buffer size: {len(data_recorder._buffer)}", flush=True)
             except Exception as e:
                 print(f"Error saving sample statistics: {str(e)}", flush=True)
                 import traceback
                 traceback.print_exc()
             
-            print(f"--- After saving sample {sample_index} ---\n", flush=True)
+            #print(f"--- After saving sample {sample_index} ---\n", flush=True)
 
             # Backward pass and parameter updates (only if not in stats saving mode)
             if loader.training : #and not save_stats_permission
