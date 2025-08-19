@@ -130,6 +130,7 @@ def set_epoch_from_checkpoint(settings,load_ckpt):
                 iou2d = np.array([[d["stats_IoU"]] for d in _buffer])
                 _iou_matrix.append(iou2d)
                 iou2d = []
+                _buffer=[]
             _total_samples_logged_this_epoch = 0
 
 
