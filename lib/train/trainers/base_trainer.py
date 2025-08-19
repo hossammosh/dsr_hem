@@ -114,7 +114,9 @@ class BaseTrainer:
                         checkpoint_path = checkpoint['path']  # Get the actual file path
                         self.load_checkpoint(checkpoint_path)
                         start_epoch = load_ckpt + 1
+
                         print(f"Set start_epoch to: {start_epoch}")
+                        data_recorder.set_epoch_from_checkpoint(self.settings,load_ckpt)
                     else:
                         print(f"Checkpoint {load_ckpt} does not exist. Available checkpoints: {checkpoint_epochs}")
 

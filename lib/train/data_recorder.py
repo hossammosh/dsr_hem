@@ -72,6 +72,12 @@ def _clean_previous_experiments():
                 print(f"Error deleting {file}: {e}", flush=True)
     else:
         print("No existing files to clean up.", flush=True)
+def _get_old_filename(settings):
+    pm = settings.phase_manager
+    """Generate filename in the format: phase_{phase}_epoch_{epoch}_samples_{samples}.csv"""
+    phase = pm.number
+    samples = pm.SPE
+    return f'phase_{phase}_epoch_{settings.epoch}_samples_{samples}.csv'
 
 def set_epoch(settings):
     """
@@ -82,6 +88,20 @@ def set_epoch(settings):
 
     with _file_lock:
         # Reset for new epoch
+        _buffer = []
+        _total_samples_logged_this_epoch = 0
+
+        if settings.epoch == 1:
+            _clean_previous_experiments()
+def set_epoch_from_checkpoint(settings,load_ckpt):
+    """
+    Sets the current epoch, clearing buffers and state for the new epoch.
+    If settings.epoch is 1, also cleans up any previous experiment files.
+    """
+    global _buffer, _total_samples_logged_this_epoch
+    settings.phase_manager.set_phase(load_ckpt)
+    with _file_lock:
+
         _buffer = []
         _total_samples_logged_this_epoch = 0
 
