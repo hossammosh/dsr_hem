@@ -72,12 +72,13 @@ def _clean_previous_experiments():
                 print(f"Error deleting {file}: {e}", flush=True)
     else:
         print("No existing files to clean up.", flush=True)
-def _get_old_filename(settings):
+def _get_old_filename(settings,epoch):
     pm = settings.phase_manager
     """Generate filename in the format: phase_{phase}_epoch_{epoch}_samples_{samples}.csv"""
     phase = pm.number
     samples = pm.SPE
-    return f'phase_{phase}_epoch_{settings.epoch}_samples_{samples}.csv'
+
+    return f'phase_{phase}_epoch_{epoch}_samples_{samples}.csv'
 
 def set_epoch(settings):
     """
@@ -99,14 +100,42 @@ def set_epoch_from_checkpoint(settings,load_ckpt):
     If settings.epoch is 1, also cleans up any previous experiment files.
     """
     global _buffer, _total_samples_logged_this_epoch
-    settings.phase_manager.set_phase(load_ckpt)
     with _file_lock:
+        if (settings.phase_manager.number == 1):
+            for epoch in range(1, load_ckpt + 1):
+                try:
+                    # Get the filename for the current epoch's checkpoint
+                    filename = _get_old_filename(settings, epoch)
+                    if os.path.exists(filename):
+                        try:
+                            # Read the file based on extension
+                            if filename.endswith('.csv'):
+                                df = pd.read_csv(filename)
+                            elif filename.endswith(('.xlsx', '.xls')):
+                                df = pd.read_excel(filename)
+                            else:
+                                print(f"Unsupported file format for {filename}")
+                                continue
+                            _buffer.extend(df.to_dict('records'))
+                            print(f"Loaded checkpoint'stats for  epoch {epoch}")
+                        except Exception as e:
+                            print(f"Error loading {filename}: {str(e)}")
+                    else:
+                        print(f"Warning: Checkpoint for epoch {epoch} not found at {filename}")
+                except Exception as e:
+                    print(f"Error loading checkpoint for epoch {epoch}: {str(e)}")
+                loss2d = np.array([[d['stats/Loss_total']] for d in _buffer])
+                _loss_matrix.append(loss2d)
+                loss2d = []
+                iou2d = np.array([[d["stats_IoU"]] for d in _buffer])
+                _iou_matrix.append(iou2d)
+                iou2d = []
+            _total_samples_logged_this_epoch = 0
 
-        _buffer = []
-        _total_samples_logged_this_epoch = 0
 
-        if settings.epoch == 1:
-            _clean_previous_experiments()
+
+            if settings.epoch == 1:
+                _clean_previous_experiments()
 def save_samples(settings):
     """Saves all collected samples and processes phase metrics."""
     global _buffer, _loss_matrix, _iou_matrix
