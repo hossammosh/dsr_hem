@@ -131,6 +131,37 @@ def set_epoch_from_checkpoint(settings,load_ckpt):
                 _iou_matrix.append(iou2d)
                 iou2d = []
                 _buffer=[]
+            if (settings.phase_manager.number == 2):
+                for epoch in range(settings.phase_manager.Lepoch ,load_ckpt+ 1):
+                    try:
+                        # Get the filename for the current epoch's checkpoint
+                        filename = _get_old_filename(settings, epoch)
+                        if os.path.exists(filename):
+                            try:
+                                # Read the file based on extension
+                                if filename.endswith('.csv'):
+                                    df = pd.read_csv(filename)
+                                elif filename.endswith(('.xlsx', '.xls')):
+                                    df = pd.read_excel(filename)
+                                else:
+                                    print(f"Unsupported file format for {filename}")
+                                    continue
+                                _buffer.extend(df.to_dict('records'))
+                                print(f"Loaded checkpoint'stats for  epoch {epoch}")
+                            except Exception as e:
+                                print(f"Error loading {filename}: {str(e)}")
+                        else:
+                            print(f"Warning: Checkpoint for epoch {epoch} not found at {filename}")
+                    except Exception as e:
+                        print(f"Error loading checkpoint for epoch {epoch}: {str(e)}")
+                    loss2d = np.array([[d['stats/Loss_total']] for d in _buffer])
+                    _loss_matrix.append(loss2d)
+                    loss2d = []
+                    iou2d = np.array([[d["stats_IoU"]] for d in _buffer])
+                    _iou_matrix.append(iou2d)
+                    iou2d = []
+                    _buffer = []
+
             _total_samples_logged_this_epoch = 0
 
 
