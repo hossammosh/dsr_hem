@@ -133,8 +133,8 @@ def set_epoch_from_checkpoint(settings,load_ckpt):
                 _buffer=[]
         # *************************************************************  phase 2,3   **********************
         if (settings.phase_manager.number == 2 or settings.phase_manager.number == 3):
-            settings.phase_manager.dslh = pd.read_excel("first_stage_low_hardness_samples_epoch_6.xlsx")
-            fn = "source_phase2_epoch_6.xlsx"
+            settings.phase_manager.dslh = pd.read_excel(settings.phase_manager.dslh_samples)
+            fn = settings.phase_manager.ds_sp2
             settings.phase_manager.ds_phase2 = pd.read_excel(fn)
             for epoch in range(settings.phase_manager.Lepoch ,load_ckpt+ 1):
                 try:
@@ -169,8 +169,7 @@ def set_epoch_from_checkpoint(settings,load_ckpt):
                 _total_samples_logged_this_epoch = 0
         # *************************************************************  phase 4   **********************
         if (settings.phase_manager.number == 4):
-            fn = "source_phase4_epoch_16.xlsx"
-            settings.phase_manager.ds_phase4 = pd.read_excel(fn)
+            settings.phase_manager.ds_phase4 = pd.read_excel(settings.phase_manager.ds_sp4)
             for epoch in range(settings.phase_manager.Lepoch ,load_ckpt+ 1):
                 try:
                     # Get the filename for the current epoch's checkpoint
@@ -258,6 +257,8 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
             save_samples(settings)
             # Check if we've reached the end of the current phase
 
+#########  ******************* 1 Phase   ********************************************************************
+
             if settings.epoch == settings.phase_manager.L1:
                 hardness_scores = calculate_hardness_scores(settings, _loss_matrix, _iou_matrix, alpha=0.7, beta=0.3)
                 _loss_matrix = []
@@ -272,13 +273,11 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
                 df = pd.DataFrame(_buffer)
                 settings.phase_manager.ds_phase2 = df
                 settings.phase_manager.dslh = pd.DataFrame(_buffer_copy[settings.phase_manager.SPE2:])
-                output_file = _get_tmp_filename(settings, 'source_phase2')
-                excel_file = output_file.replace('.csv', '.xlsx')
-                df.to_excel(excel_file, index=False)
-                output_file = _get_tmp_filename(settings, 'first_stage_low_hardness_samples')
-                excel_file = output_file.replace('.csv', '.xlsx')
-                settings.phase_manager.dslh.to_excel(excel_file, index=False)
-#########  ******************* 3 Phase
+                fn = settings.phase_manager.ds_sp2
+                df.to_excel(fn, index=False)
+                fn = settings.phase_manager.dslh_samples
+                settings.phase_manager.dslh.to_excel(fn, index=False)
+#########  ******************* 3 Phase   ********************************************************************
 
             if settings.epoch == settings.phase_manager.L3:
                 hardness_scores = calculate_hardness_scores(settings, _loss_matrix, _iou_matrix, alpha=0.7, beta=0.3)
@@ -291,24 +290,19 @@ def samples_stats_save(sample_index: int, data_info: dict, stats: dict, settings
                 dslh_ss_indices = np.random.randint(0, len(settings.phase_manager.dslh),
                                                     size=diversity_samples).tolist()
                 dslh_ss=settings.phase_manager.dslh_ss = settings.phase_manager.dslh.loc[dslh_ss_indices]
-
-                output_file = _get_tmp_filename(settings, '3rd_stage_diverse_samples_from_phase1')
-                excel_file = output_file.replace('.csv', '.xlsx')
-                dslh_ss.to_excel(excel_file, index=False)
+                fn=settings.phase_manager.diverse_samples
+                dslh_ss.to_excel(fn, index=False)
 
                 _buffer.sort(key=lambda x: x.get('Hardness_Score', 0), reverse=True)
                 _buffer = _buffer[:settings.phase_manager.SPE4]
                 df = pd.DataFrame(_buffer)
-
-                output_file = _get_tmp_filename(settings, '3rd_stage_top_hardness_samples')
-                excel_file = output_file.replace('.csv', '.xlsx')
-                df.to_excel(excel_file, index=False)
+                fn = settings.phase_manager.hl_samples
+                df.to_excel(fn, index=False)
 
                 df=pd.concat ([df, dslh_ss], ignore_index=True)
                 settings.phase_manager.ds_phase4 = df
-                output_file = _get_tmp_filename(settings, 'source_phase4')
-                excel_file = output_file.replace('.csv', '.xlsx')
-                df.to_excel(excel_file, index=False)
+                fn = settings.phase_manager.ds_sp4
+                df.to_excel(fn, index=False)
 
 def _safe_str_list(value):
     """Safely convert lists or other types to string."""

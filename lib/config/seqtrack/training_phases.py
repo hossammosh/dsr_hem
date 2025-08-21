@@ -36,8 +36,13 @@ class Phase:
         self.DESC = ""       # Description of the phase
         self.L = 0
         self.ds_phase2=None
-        self.ds_low_hardness = None
-        
+        self.ds_phase4 = None
+        self.ds_sp2 = "data_set_source_phase2.xlsx"
+        self.ds_sp4 = "data_set_source_phase4.xlsx"
+        self.dslh_samples = "first_phase_low_hardness_samples.xlsx"
+        self.diverse_samples = "3rd_stage_diverse_samples_from_phase1.xlsx"
+        self.hl_samples="3rd_stage_top_hardness_samples.xlsx"
+
         # Set default config path if not provided
         self.config_path = config_path
     
