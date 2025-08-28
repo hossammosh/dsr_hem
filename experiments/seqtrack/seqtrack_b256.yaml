@@ -34,7 +34,7 @@ PHASES:
   L1: 5
   L2: 10
   L3: 15
-  L4: 20
+  L4: 25
   DSLH: 3
 MODEL:
   ENCODER:
@@ -60,7 +60,7 @@ TRAIN:
     TYPE: step
     DECAY_RATE: 0.1
   WEIGHT_DECAY: 0.0001
-  ss_print_interval: 100
+  ss_print_interval: 200
   checkpoint_save_interval: 1               # Number of epochs between checkpoints
   selected_sampling: true                   # Whether to use selected sampling
   top_sample_ratio: .6

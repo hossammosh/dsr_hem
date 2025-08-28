@@ -56,7 +56,7 @@ class LTRTrainer(BaseTrainer):
 
 
         for i, data in enumerate(loader, 1):
-            # if(self.settings.epoch==17):
+            # if(self.settings.epoch==19):
             #     breakpoint()
             self.iteration_counter += 1
             data_info = data[1]
@@ -87,11 +87,8 @@ class LTRTrainer(BaseTrainer):
                 print(f"Error saving sample statistics: {str(e)}", flush=True)
                 import traceback
                 traceback.print_exc()
-            
-            #print(f"--- After saving sample {sample_index} ---\n", flush=True)
-
             # Backward pass and parameter updates (only if not in stats saving mode)
-            if loader.training : #and not save_stats_permission
+            if loader.training :
                 self.optimizer.zero_grad()
                 if not self.use_amp:
                     loss.backward()
@@ -173,7 +170,8 @@ class LTRTrainer(BaseTrainer):
         ss_print_interval = self.settings.ss_print_interval
 
         # Then use it in the conditional check
-        if i % ss_print_interval == 0 or i == loader.__len__() or i == self.settings.top_selected_samples:
+        #if i % ss_print_interval == 0 or i == loader.__len__() or i == self.settings.top_selected_samples:
+        if i % ss_print_interval == 0 or i == loader.__len__() or i == self.settings.phase_manager.SPE:
             # Format time in days, hours, minutes, seconds with fixed width
             def format_time(seconds):
                 days = int(seconds // (24 * 3600))
@@ -276,10 +274,20 @@ class LTRTrainer(BaseTrainer):
                     try:
                         with open(log_file_path, 'a') as f:
                             f.write(log_str)
+                            f.flush()  # ✅ force flush immediately
+                            print("flushed log file", flush=True)
                     except Exception as e:
-                        print(f"Error writing to log file {log_file_path}: {e}",flush=True)
+                        print(f"Error writing to log file {log_file_path}: {e}", flush=True)
                 else:
-                    print("Log file path not configured in settings.",flush=True)
+                    print("Log file path not configured in settings.", flush=True)
+                # if log_file_path:
+                #     try:
+                #         with open(log_file_path, 'a') as f:
+                #             f.write(log_str)
+                #     except Exception as e:
+                #         print(f"Error writing to log file {log_file_path}: {e}",flush=True)
+                # else:
+                #     print("Log file path not configured in settings.",flush=True)
     # Save checkpoint only for the first 10 epochs as requested for the initial stage
     def _write_tensorboard(self):
         if self.settings.epoch == 1:

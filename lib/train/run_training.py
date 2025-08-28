@@ -20,6 +20,7 @@ def init_seeds(seed):
     torch.backends.cudnn.benchmark = False
 
 
+
 def run_training(script_name, config_name, cudnn_benchmark=True, local_rank=-1, save_dir=None, base_seed=None, use_lmdb=False):
     """Run the train script.
     args:

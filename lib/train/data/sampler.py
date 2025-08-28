@@ -93,6 +93,7 @@ class TrackingSampler(torch.utils.data.Dataset):
 
         return random.choices(valid_ids, k=num_ids)
     def __getitem__(self, index):
+        #breakpoint()
         self.row_index += 1
         if self.train_cls:
             return self.getitem_cls()
