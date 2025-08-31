@@ -82,7 +82,7 @@ class LTRTrainer(BaseTrainer):
                     settings=self.settings
                 )
                 #print(f"Successfully saved sample {sample_index} to buffer", flush=True)
-                print(f"Current buffer size: {len(data_recorder._buffer)}", flush=True)
+                #print(f"Current buffer size: {len(data_recorder._buffer)}", flush=True)
             except Exception as e:
                 print(f"Error saving sample statistics: {str(e)}", flush=True)
                 import traceback

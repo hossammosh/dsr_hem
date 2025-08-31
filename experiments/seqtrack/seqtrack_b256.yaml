@@ -25,17 +25,17 @@ DATA:
     - LASOT
     DATASETS_RATIO:
     - 1
-    SAMPLE_PER_EPOCH: 60000                    # Number of training samples per epoch
+    SAMPLE_PER_EPOCH: 50                    # Number of training samples per epoch
 PHASES:
   SPE1: 1
   SPE2: 0.6
   SPE3: 0.6
   SPE4: 0.6
-  L1: 70
-  L2: 150
-  L3: 170
-  L4: 220
-  DSLH: 3600
+  L1: 5
+  L2: 10
+  L3: 15
+  L4: 20
+  DSLH: 3
 MODEL:
   ENCODER:
     TYPE: vit_base_patch16
@@ -48,7 +48,7 @@ MODEL:
 TRAIN:
   ENCODER_MULTIPLIER: 0.1
   BATCH_SIZE: 1
-  max_epochs: 300  # Total training epochs
+  max_epochs: 20  # Total training epochs
 
   GRAD_CLIP_NORM: 0.1
   CE_WEIGHT: 1.0

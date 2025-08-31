@@ -91,5 +91,5 @@ def run(settings):
     optimizer, lr_scheduler = get_optimizer_scheduler(net, cfg)
     use_amp = getattr(cfg.TRAIN, "AMP", False)
     trainer = LTRTrainer(actor, [loader_train], optimizer, settings, lr_scheduler, use_amp=use_amp)
-    trainer.train(cfg.TRAIN.max_epochs, load_latest=True, fail_safe=True)
-    #trainer.train(cfg.TRAIN.max_epochs, load_latest=False, load_ckpt=12, fail_safe=True)
+    #trainer.train(cfg.TRAIN.max_epochs, load_latest=True, fail_safe=True)
+    trainer.train(cfg.TRAIN.max_epochs, load_latest=False, load_ckpt=3, fail_safe=True)

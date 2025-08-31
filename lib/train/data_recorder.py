@@ -78,7 +78,8 @@ def _get_old_filename(settings,epoch):
     phase = pm.number
     samples = pm.SPE
 
-    return f'phase_{phase}_epoch_{epoch}_samples_{samples}.csv'
+    filename= os.path.join(settings.env.workspace_dir, f'phase_{phase}_epoch_{epoch}_samples_{samples}.csv')
+    return filename
 
 def set_epoch(settings):
     """
@@ -105,23 +106,43 @@ def set_epoch_from_checkpoint(settings,load_ckpt):
             for epoch in range(1, load_ckpt + 1):
                 try:
                     # Get the filename for the current epoch's checkpoint
-                    filename = _get_old_filename(settings, epoch)
-                    if os.path.exists(filename):
+                    fn_csv = _get_old_filename(settings, epoch)
+                    fn_xlsx = os.path.splitext(fn_csv)[0] + '.xlsx'
+                    current_dir = os.getcwd()
+                    print(f"Current working directory: {current_dir}")
+
+                    # List all .xlsx files in the current directory
+                    print("\nExcel files in current directory:")
+                    for file in os.listdir('.'):
+                        if file.endswith('.xlsx'):
+                            print(f"- {file}")
+                    print()  # Add an empty line for better readability
+
+                    print("fn_csv",fn_csv)
+                    print("fn_xlsx",fn_xlsx)
+
+                    if os.path.exists(fn_csv):
+                        print("os.path.exists(csv file exisits)", os.path.exists(fn_csv))
+                    if os.path.exists(fn_xlsx):
+                        print("os.path.exists(excel file exisits)", os.path.exists(fn_csv))
+                    if os.path.exists(fn_csv) or os.path.exists(fn_xlsx):
                         try:
                             # Read the file based on extension
-                            if filename.endswith('.csv'):
-                                df = pd.read_csv(filename)
-                            elif filename.endswith(('.xlsx', '.xls')):
-                                df = pd.read_excel(filename)
+                            if fn_csv.endswith('.csv'):
+
+                                df = pd.read_csv(fn_csv)
+                            elif fn_csv.endswith(('.xlsx', '.xls')):
+
+                                df = pd.read_excel(fn_csv)
                             else:
-                                print(f"Unsupported file format for {filename}")
+                                print(f"Unsupported file format for {fn_csv}")
                                 continue
                             _buffer.extend(df.to_dict('records'))
                             print(f"Loaded checkpoint'stats for  epoch {epoch}")
                         except Exception as e:
-                            print(f"Error loading {filename}: {str(e)}")
+                            print(f"Error loading {fn_csv}: {str(e)}")
                     else:
-                        print(f"Warning: Checkpoint for epoch {epoch} not found at {filename}")
+                        print(f"Warning: Checkpoint for epoch {epoch} not found at {fn_csv}")
                 except Exception as e:
                     print(f"Error loading checkpoint for epoch {epoch}: {str(e)}")
                 loss2d = np.array([[d['stats/Loss_total']] for d in _buffer])
