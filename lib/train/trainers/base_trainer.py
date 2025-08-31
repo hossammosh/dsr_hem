@@ -125,7 +125,7 @@ class BaseTrainer:
                 if distill:
                     directory_teacher = '{}/{}'.format(self._checkpoint_dir, self.settings.project_path_teacher)
                     self.load_state_dict(directory_teacher, distill=True)
-
+# ****************************************************************************** Training loop ******************************************************************************
                 for epoch in range(start_epoch, max_epochs + 1):
                     self.settings.epoch = epoch
                     

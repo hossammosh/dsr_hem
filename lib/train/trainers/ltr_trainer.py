@@ -63,7 +63,7 @@ class LTRTrainer(BaseTrainer):
             sample_index = data[2]
             data = data[0]
 
-            print(f"Processing sample {sample_index}, iteration {self.iteration_counter}", flush=True)
+            #print(f"Processing sample {sample_index}, iteration {self.iteration_counter}", flush=True)
             if self.move_data_to_gpu:
                 data = data.to(self.device)
             data['epoch'] = self.settings.epoch
